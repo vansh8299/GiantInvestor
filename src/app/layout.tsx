@@ -10,7 +10,7 @@ import { usePathname } from 'next/navigation';
 const inter = Inter({ subsets: ["latin"] });
 
 // Define routes where header and footer should be hidden
-const authRoutes = ['/pages/login', '/pages/signup','/pages/verifyotp', '/pages/forgot-password'];
+const authRoutes = ['/pages/login', '/pages/signup','/pages/verifyotp','/pages/resetPassword', '/pages/forgetpassword'];
 
 export default function RootLayout({
   children,

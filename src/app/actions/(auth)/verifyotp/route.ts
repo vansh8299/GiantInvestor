@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, otp } = await req.json();
+    const { email, otp, mode } = await req.json();
 
     // Validate required fields
     if (!email || !otp) {
@@ -43,23 +43,56 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update user verification status
+    // Handle password reset mode
+    if (mode === 'reset') {
+      if (!user.passwordResetRequested) {
+        return NextResponse.json(
+          { error: 'No password reset requested' },
+          { status: 400 }
+        );
+      }
+
+      // Update user for password reset verification
+      await prisma.user.update({
+        where: { email },
+        data: {
+          isVerified: true,
+          passwordResetVerified: true,
+          otp: null,
+          otpExpiry: null,
+        },
+      });
+
+      return NextResponse.json(
+        {
+          message: 'Password reset verification successful',
+          verified: true,
+          mode: 'reset'
+        },
+        { status: 200 }
+      );
+    }
+
+    // Handle registration verification (default mode)
     await prisma.user.update({
       where: { email },
       data: {
         isVerified: true,
+        emailVerified: new Date(),
         otp: null,
         otpExpiry: null,
       },
     });
 
     return NextResponse.json(
-      { 
+      {
         message: 'Email verified successfully',
-        verified: true
+        verified: true,
+        mode: 'registration'
       },
       { status: 200 }
     );
+
   } catch (error) {
     console.error('Verify OTP error:', error);
     return NextResponse.json(

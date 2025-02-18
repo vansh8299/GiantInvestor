@@ -28,8 +28,7 @@ export async function POST(request: { json: () => PromiseLike<{ email: string; p
 
     const response = NextResponse.json({ message: 'Login successful' }, );
     console.log('token', token);
-    response.cookies.set('token', token, { httpOnly: true, maxAge: 86400, path: '/' });
-
+    response.cookies.set('token', token, { maxAge: 86400, path: '/' });
     return response;
   } catch (error) {
     return NextResponse.json({ error}, { status: 500 });

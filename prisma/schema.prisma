@@ -9,14 +9,17 @@ datasource db {
 
 
 model User {
-  id           String   @id @default(cuid())
-  firstName    String
-  lastName     String
-  email        String   @unique
-  password     String
-  otp          String?
-  otpExpiry    DateTime?
-  isVerified   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  firstName               String
+  lastName                String
+  email                   String   @unique
+  password                String
+  otp                     String?
+  otpExpiry               DateTime?
+  emailVerified           DateTime?
+  passwordResetRequested  Boolean   @default(false)
+  passwordResetVerified   Boolean   @default(false)
+  isVerified              Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }

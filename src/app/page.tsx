@@ -1,19 +1,57 @@
-import React from 'react';
-import {  TrendingUp, Wallet, Gift  } from 'lucide-react';
+"use client"
 
+import React from 'react';
+import { useEffect, useState } from 'react';
+import { Wallet, Gift } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from "next/link";
+import { Button } from '@/components/ui/button';
+
+type Stock = {
+  ticker: string;
+  price: string;
+  change_percentage: string;
+};
+
+type ApiResponse = {
+  top_gainers: Stock[];
+  top_losers: Stock[];
+  most_actively_traded: Stock[];
+};
 
 const HomePage = () => {
+  const [data, setData] = useState<ApiResponse>({ top_gainers: [], top_losers: [], most_actively_traded: [] });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/actions/topgainersorlosers');
+        const result: ApiResponse = await response.json();
+        setData(result);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   const stockIndices = [
     { name: 'NIFTY 50', value: '22,419.50', change: '+0.45%', isPositive: true },
     { name: 'SENSEX', value: '73,821.20', change: '+0.38%', isPositive: true },
     { name: 'BANK NIFTY', value: '47,312.30', change: '-0.12%', isPositive: false }
   ];
 
-  const topStocks = [
-    { name: 'TCS', price: '4,012.45', change: '+2.3%', isPositive: true },
-    { name: 'Reliance', price: '2,845.30', change: '+1.8%', isPositive: true },
-    { name: 'HDFC Bank', price: '1,478.90', change: '-0.7%', isPositive: false }
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -50,24 +88,26 @@ const HomePage = () => {
         </div>
 
         {/* Top Stocks */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-semibold">Top Stocks</h2>
-            <TrendingUp className="w-5 h-5 text-gray-600" />
-          </div>
-          <div className="space-y-3">
-            {topStocks.map((stock) => (
-              <div key={stock.name} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                <div>
-                  <div className="font-medium">{stock.name}</div>
-                  <div className="text-sm text-gray-600">₹{stock.price}</div>
-                </div>
-                <div className={`text-sm ${stock.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                  {stock.change}
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="min-h-screen bg-white">
+          <main className="pt-10 px-4">
+            <Tabs defaultValue="gainers" className="w-full">
+              <TabsList>
+                <TabsTrigger value="gainers">Top Gainers</TabsTrigger>
+                <TabsTrigger value="losers">Top Losers</TabsTrigger>
+                <TabsTrigger value="most_traded">Most Traded</TabsTrigger>
+              </TabsList>
+              <Link href="/pages/getAllStocks"><Button className='ml-5'>See all stocks</Button></Link>
+              <TabsContent value="gainers">
+                <StockList stocks={data.top_gainers} />
+              </TabsContent>
+              <TabsContent value="losers">
+                <StockList stocks={data.top_losers} />
+              </TabsContent>
+              <TabsContent value="most_traded">
+                <StockList stocks={data.most_actively_traded} />
+              </TabsContent>
+            </Tabs>
+          </main>
         </div>
       </main>
 
@@ -82,6 +122,28 @@ const HomePage = () => {
           ))}
         </div>
       </nav>
+    </div>
+  );
+};
+
+const StockList = ({ stocks }: { stocks: Stock[] | undefined }) => {
+  if (!stocks) {
+    return <div>No stocks available</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {stocks.map((stock, index) => (
+        <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+          <div>
+            <div className="font-medium">{stock.ticker}</div>
+            <div className="text-sm text-gray-600">${stock.price}</div>
+          </div>
+          <div className={`text-sm ${stock.change_percentage.includes('+') ? 'text-green-500' : 'text-red-500'}`}>
+            {stock.change_percentage}
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
