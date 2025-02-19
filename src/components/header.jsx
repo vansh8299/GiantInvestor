@@ -31,6 +31,7 @@ const Header = () => {
             className="bg-transparent w-full ml-2 focus:outline-none"
           />
         </div>
+        
       </div>
         <div className="flex items-center gap-4">
           {token ? (

@@ -14,6 +14,8 @@ const GetAllStocks = () => {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
     const fetchStocks = async () => {
@@ -36,6 +38,30 @@ const GetAllStocks = () => {
 
     fetchStocks();
   }, []);
+
+  // Get current stocks
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentStocks = stocks.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Change page
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+
+  // Go to next page
+  const nextPage = () => {
+    if (currentPage < Math.ceil(stocks.length / itemsPerPage)) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // Go to previous page
+  const prevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -74,7 +100,7 @@ const GetAllStocks = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {stocks.map((stock, index) => (
+              {currentStocks.map((stock, index) => (
                 <tr key={index} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {stock.symbol}
@@ -95,6 +121,34 @@ const GetAllStocks = () => {
               ))}
             </tbody>
           </table>
+        </div>
+        {/* Pagination Controls */}
+        <div className="flex justify-center mt-8 items-center">
+          <button
+            onClick={prevPage}
+            disabled={currentPage === 1}
+            className={`mx-1 px-4 py-2 rounded ${
+              currentPage === 1
+                ? "bg-gray-300 cursor-not-allowed"
+                : "bg-green-500 text-white hover:bg-green-600"
+            }`}
+          >
+            Previous
+          </button>
+          <span className="mx-4 text-gray-700">
+            Page {currentPage} of {Math.ceil(stocks.length / itemsPerPage)}
+          </span>
+          <button
+            onClick={nextPage}
+            disabled={currentPage === Math.ceil(stocks.length / itemsPerPage)}
+            className={`mx-1 px-4 py-2 rounded ${
+              currentPage === Math.ceil(stocks.length / itemsPerPage)
+                ? "bg-gray-300 cursor-not-allowed"
+                : "bg-green-500 text-white hover:bg-green-600"
+            }`}
+          >
+            Next
+          </button>
         </div>
       </div>
     </div>

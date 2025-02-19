@@ -2,7 +2,7 @@
 
 import { Inter } from "next/font/google";
 import Header from "@/components/header";
-import Footer from "@/components/footer";
+
 import "./globals.css";
 import { Toaster } from "sonner";
 import { usePathname } from 'next/navigation';
@@ -24,9 +24,9 @@ export default function RootLayout({
         {!isAuthPage && <Header />}
         <main className="min-h-screen">{children}</main>
         <Toaster richColors />
-        {!isAuthPage && (
+        {/* {!isAuthPage && (
          <Footer />
-        )}
+        )} */}
       </body>
     </html>
   );

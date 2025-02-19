@@ -112,14 +112,14 @@ export async function POST(req: NextRequest) {
       console.log('Attempting to send email...');
       const info = await transporter.sendMail({
         from: {
-          name: 'Your App Name',
+          name: 'Giant Investor',
           address: process.env.EMAIL_USER as string
         },
         to: email,
         subject: 'Verify your email',
         html: `
           <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>Welcome to Your App!</h2>
+            <h2>Welcome to Giant Investor!</h2>
             <p>Hello ${firstName},</p>
             <p>Your verification code is: <strong>${otp}</strong></p>
             <p>This code will expire in 10 minutes.</p>
