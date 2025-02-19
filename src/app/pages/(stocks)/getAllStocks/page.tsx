@@ -1,6 +1,7 @@
 "use client"; // Mark this as a Client Component
 
 import React, { useEffect, useState } from "react";
+import { useSearchContext } from "@/context/SearchContext"; // Import search context
 
 interface Stock {
   symbol: string;
@@ -16,6 +17,7 @@ const GetAllStocks = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const { searchQuery } = useSearchContext(); // Get search query from context
 
   useEffect(() => {
     const fetchStocks = async () => {
@@ -39,23 +41,35 @@ const GetAllStocks = () => {
     fetchStocks();
   }, []);
 
+  // Filter stocks based on search query
+  const filteredStocks = stocks.filter(stock =>
+    stock.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Function to highlight matching text
+  const highlightMatch = (text: string, query: string) => {
+    if (!query) return text;
+    const regex = new RegExp(`(${query})`, "gi");
+    return text.split(regex).map((part, index) =>
+      part.toLowerCase() === query.toLowerCase() ? (
+        <span key={index} className="bg-yellow-300">{part}</span>
+      ) : (
+        part
+      )
+    );
+  };
+
   // Get current stocks
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentStocks = stocks.slice(indexOfFirstItem, indexOfLastItem);
+  const currentStocks = filteredStocks.slice(indexOfFirstItem, indexOfLastItem);
 
-  // Change page
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
-
-  // Go to next page
   const nextPage = () => {
-    if (currentPage < Math.ceil(stocks.length / itemsPerPage)) {
+    if (currentPage < Math.ceil(filteredStocks.length / itemsPerPage)) {
       setCurrentPage(currentPage + 1);
     }
   };
 
-  // Go to previous page
   const prevPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
@@ -63,11 +77,7 @@ const GetAllStocks = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
-      </div>
-    );
+    return <div className="text-center py-8">Loading...</div>;
   }
 
   if (error) {
@@ -76,47 +86,29 @@ const GetAllStocks = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-center mb-8">Stock Listings</h1>
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
           <table className="min-w-full">
             <thead className="bg-gray-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Symbol
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Exchange
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  IPO Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Symbol</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exchange</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IPO Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {currentStocks.map((stock, index) => (
                 <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {stock.symbol}
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{stock.symbol}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    {highlightMatch(stock.name, searchQuery)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {stock.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {stock.exchange}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {stock.ipoDate}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {stock.status}
-                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{stock.exchange}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{stock.ipoDate}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{stock.status}</td>
                 </tr>
               ))}
             </tbody>
@@ -124,31 +116,9 @@ const GetAllStocks = () => {
         </div>
         {/* Pagination Controls */}
         <div className="flex justify-center mt-8 items-center">
-          <button
-            onClick={prevPage}
-            disabled={currentPage === 1}
-            className={`mx-1 px-4 py-2 rounded ${
-              currentPage === 1
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-green-500 text-white hover:bg-green-600"
-            }`}
-          >
-            Previous
-          </button>
-          <span className="mx-4 text-gray-700">
-            Page {currentPage} of {Math.ceil(stocks.length / itemsPerPage)}
-          </span>
-          <button
-            onClick={nextPage}
-            disabled={currentPage === Math.ceil(stocks.length / itemsPerPage)}
-            className={`mx-1 px-4 py-2 rounded ${
-              currentPage === Math.ceil(stocks.length / itemsPerPage)
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-green-500 text-white hover:bg-green-600"
-            }`}
-          >
-            Next
-          </button>
+          <button onClick={prevPage} disabled={currentPage === 1} className="mx-1 px-4 py-2 bg-green-500 text-white rounded">Previous</button>
+          <span className="mx-4 text-gray-700">Page {currentPage} of {Math.ceil(filteredStocks.length / itemsPerPage)}</span>
+          <button onClick={nextPage} disabled={currentPage === Math.ceil(filteredStocks.length / itemsPerPage)} className="mx-1 px-4 py-2 bg-green-500 text-white rounded">Next</button>
         </div>
       </div>
     </div>

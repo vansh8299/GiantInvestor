@@ -3,10 +3,11 @@ import { Button } from "./ui/button";
 import { Bell, Search } from "lucide-react";
 import cookies from 'js-cookie';
 import { useEffect, useState } from "react";
+import { useSearchContext } from "@/context/SearchContext";
 
 const Header = () => {
   const [token, setToken] = useState(null);
-
+  const { searchQuery, setSearchQuery } = useSearchContext();
   useEffect(() => {
     // Check for the token only after the component has mounted
     const tokenFromCookies = cookies.get('token');
@@ -26,6 +27,8 @@ const Header = () => {
         <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 w-[35rem]">
           <Search className="w-15 h-5 text-gray-400" />
           <input 
+           value={searchQuery}
+           onChange={(e) => setSearchQuery(e.target.value)}
             type="text"
             placeholder="Search stocks, mutual funds & more"
             className="bg-transparent w-full ml-2 focus:outline-none"
