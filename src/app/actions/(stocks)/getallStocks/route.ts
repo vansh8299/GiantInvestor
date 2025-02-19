@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const apiKey = process.env.ALPHA_VANTAGE_API_KEY; // Store your API key in .env
-  const url = `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${apiKey}`;
+  // const apiKey = process.env.ALPHA_VANTAGE_API_KEY; // Store your API key in .env
+  // const url = `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=${apiKey}`;
+  const url = `https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=demo`;
+
 
   try {
     const response = await fetch(url);

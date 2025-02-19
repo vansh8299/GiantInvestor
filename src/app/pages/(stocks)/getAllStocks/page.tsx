@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSearchContext } from "@/context/SearchContext"; // Import search context
+import Link from "next/link";
 
 interface Stock {
   symbol: string;
@@ -77,7 +78,11 @@ const GetAllStocks = () => {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading...</div>;
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+      </div>
+    );
   }
 
   if (error) {
@@ -100,18 +105,36 @@ const GetAllStocks = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {currentStocks.map((stock, index) => (
-                <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{stock.symbol}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {highlightMatch(stock.name, searchQuery)}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{stock.exchange}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{stock.ipoDate}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{stock.status}</td>
-                </tr>
-              ))}
-            </tbody>
+  {currentStocks.map((stock, index) => (
+    <tr key={index} className="hover:bg-gray-50 transition-colors">
+      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+        <Link href={`/pages/getAllStocks/${stock.symbol}`} passHref>
+          {stock.symbol}
+        </Link>
+      </td>
+      <td className="px-6 py-4 text-sm text-gray-500">
+        <Link href={`/pages/getAllStocks/${stock.symbol}`} passHref>
+          {highlightMatch(stock.name, searchQuery)}
+        </Link>
+      </td>
+      <td className="px-6 py-4 text-sm text-gray-500">
+        <Link href={`/pages/getAllStocks/${stock.symbol}`} passHref>
+          {stock.exchange}
+        </Link>
+      </td>
+      <td className="px-6 py-4 text-sm text-gray-500">
+        <Link href={`/pages/getAllStocks/${stock.symbol}`} passHref>
+          {stock.ipoDate}
+        </Link>
+      </td>
+      <td className="px-6 py-4 text-sm text-gray-500">
+        <Link href={`/pages/getAllStocks/${stock.symbol}`} passHref>
+          {stock.status}
+        </Link>
+      </td>
+    </tr>
+  ))}
+</tbody>
           </table>
         </div>
         {/* Pagination Controls */}

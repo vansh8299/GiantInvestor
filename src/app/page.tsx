@@ -96,7 +96,8 @@ const HomePage = () => {
                 <TabsTrigger value="losers">Top Losers</TabsTrigger>
                 <TabsTrigger value="most_traded">Most Traded</TabsTrigger>
               </TabsList>
-              <Link href="/pages/getAllStocks"><Button className='ml-5'>See all stocks</Button></Link>
+              <Link href="/pages/getAllStocks"><Button className='ml-5 bg-green-600'>See all stocks</Button></Link>
+              <Link href="/pages/news"><Button className='ml-5 bg-green-600'>Global News</Button></Link>
               <TabsContent value="gainers">
                 <StockList stocks={data.top_gainers} />
               </TabsContent>
