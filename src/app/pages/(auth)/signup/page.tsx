@@ -18,7 +18,7 @@ const SignUp = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
- 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [password, setPassword] = useState('');
 
 
@@ -164,8 +164,9 @@ const SignUp = () => {
         id="password"
         placeholder="Enter your password"
         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        value={formData.password}
+        onChange={handleChange}
+        
         disabled={isLoading}
         required
       />

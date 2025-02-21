@@ -48,17 +48,17 @@ const GetAllStocks = () => {
   );
 
   // Function to highlight matching text
-  const highlightMatch = (text: string, query: string) => {
-    if (!query) return text;
-    const regex = new RegExp(`(${query})`, "gi");
-    return text.split(regex).map((part, index) =>
-      part.toLowerCase() === query.toLowerCase() ? (
-        <span key={index} className="bg-yellow-300">{part}</span>
-      ) : (
-        part
-      )
-    );
-  };
+  // const highlightMatch = (text: string, query: string) => {
+  //   if (!query) return text;
+  //   const regex = new RegExp(`(${query})`, "gi");
+  //   return text.split(regex).map((part, index) =>
+  //     part.toLowerCase() === query.toLowerCase() ? (
+  //       <span key={index} className="bg-yellow-300">{part}</span>
+  //     ) : (
+  //       part
+  //     )
+  //   );
+  // };
 
   // Get current stocks
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -92,7 +92,7 @@ const GetAllStocks = () => {
   return (
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-7xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-center mb-8">Stock Listings</h1>
+        <h1 className="text-3xl font-bold text-center mb-4 mt-12">Stock Listings</h1>
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
           <table className="min-w-full">
             <thead className="bg-gray-200">
@@ -114,7 +114,7 @@ const GetAllStocks = () => {
       </td>
       <td className="px-6 py-4 text-sm text-gray-500">
         <Link href={`/pages/getAllStocks/${stock.symbol}`} passHref>
-          {highlightMatch(stock.name, searchQuery)}
+        
         </Link>
       </td>
       <td className="px-6 py-4 text-sm text-gray-500">
@@ -139,9 +139,9 @@ const GetAllStocks = () => {
         </div>
         {/* Pagination Controls */}
         <div className="flex justify-center mt-8 items-center">
-          <button onClick={prevPage} disabled={currentPage === 1} className="mx-1 px-4 py-2 bg-green-500 text-white rounded">Previous</button>
+          <button onClick={prevPage} disabled={currentPage === 1} className="mx-1 px-4 py-2 bg-green-600 text-white rounded">Previous</button>
           <span className="mx-4 text-gray-700">Page {currentPage} of {Math.ceil(filteredStocks.length / itemsPerPage)}</span>
-          <button onClick={nextPage} disabled={currentPage === Math.ceil(filteredStocks.length / itemsPerPage)} className="mx-1 px-4 py-2 bg-green-500 text-white rounded">Next</button>
+          <button onClick={nextPage} disabled={currentPage === Math.ceil(filteredStocks.length / itemsPerPage)} className="mx-1 px-4 py-2 bg-green-600 text-white rounded">Next</button>
         </div>
       </div>
     </div>
