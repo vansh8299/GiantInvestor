@@ -25,7 +25,7 @@ type OptionContract = {
 };
 
 export async function GET(request: Request, { params }: { params: { symbol: string } }) {
-    const { symbol } = params;
+    const { symbol } =await params;
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

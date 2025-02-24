@@ -182,7 +182,7 @@ const StockDetailPage = () => {
               <nav className="space-y-4 mt-10">
              
                 <a href={`/pages/companydetail/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Company Overview</a>
-                <a href="/portfolio" className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Portfolio</a>
+                <a href={`/pages/ETF/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">ETF</a>
                 <a href="/settings" className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Settings</a>
             
               </nav>

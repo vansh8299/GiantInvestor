@@ -3,15 +3,21 @@
 import { Inter } from "next/font/google";
 import Header from "@/components/header";
 import { SearchProvider } from "@/context/SearchContext";
-
 import "./globals.css";
 import { Toaster } from "sonner";
 import { usePathname } from "next/navigation";
+import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// Define routes where header and footer should be hidden
-const authRoutes = ["/pages/login", "/pages/signup", "/pages/verifyotp", "/pages/resetPassword", "/pages/forgetpassword"];
+// Define routes where header should be hidden
+const authRoutes = [
+  "/pages/login",
+  "/pages/signup",
+  "/pages/verifyotp",
+  "/pages/resetPassword",
+  "/pages/forgetpassword"
+];
 
 export default function RootLayout({
   children,
@@ -22,10 +28,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} dotted-background`}>
-        <SearchProvider>
-          {!isAuthPage && <Header />}
-          <main className="min-h-screen">{children}</main>
-        </SearchProvider>
+        <Providers>
+          <SearchProvider>
+            {!isAuthPage && <Header />}
+            <main className="min-h-screen">{children}</main>
+          </SearchProvider>
+        </Providers>
         <Toaster richColors />
       </body>
     </html>

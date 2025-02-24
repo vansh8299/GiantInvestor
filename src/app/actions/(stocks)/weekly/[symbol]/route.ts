@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request, { params }: { params: { symbol: string } }) {
-  const { symbol } = params;
+  const { symbol } = await params;
   console.log('Symbol:', symbol);
 
   const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_WEEKLY_ADJUSTED&symbol=${symbol}&apikey=demo`;
