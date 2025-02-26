@@ -6,6 +6,7 @@ import { Wallet, Gift } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from "next/link";
 import { Button } from '@/components/ui/button';
+import ReferralModal from '@/components/ReferModal';
 
 type Stock = {
   ticker: string;
@@ -22,6 +23,7 @@ type ApiResponse = {
 const HomePage = () => {
   const [data, setData] = useState<ApiResponse>({ top_gainers: [], top_losers: [], most_actively_traded: [] });
   const [loading, setLoading] = useState(true);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,16 +49,23 @@ const HomePage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-green-500"></div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Top Navigation */}
-    
+      {/* Toaster for notifications */}
+  
+      
+      {/* Referral Modal */}
+      <ReferralModal 
+        isOpen={isReferralModalOpen} 
+        onClose={() => setIsReferralModalOpen(false)} 
+      />
+      
       {/* Main Content */}
       <main className="pt-28 px-4">
         {/* Market Indices */}
@@ -81,9 +90,12 @@ const HomePage = () => {
             <Wallet className="w-5 h-5" />
             Add Money
           </button>
-          <button className="flex items-center justify-center gap-2 border border-green-600 text-green-600 rounded-lg py-3">
+          <button 
+            className="flex items-center justify-center gap-2 border border-green-600 text-green-600 rounded-lg py-3"
+            onClick={() => setIsReferralModalOpen(true)}
+          >
             <Gift className="w-5 h-5" />
-            Refer & Earn
+            Refer to a friend
           </button>
         </div>
 
@@ -97,6 +109,7 @@ const HomePage = () => {
                 <TabsTrigger value="most_traded">Most Traded</TabsTrigger>
               </TabsList>
               <Link href="/pages/getAllStocks"><Button className='ml-5 bg-green-600'>See all stocks</Button></Link>
+              <Link href="/pages/getAllETFs"><Button className='ml-5 bg-green-600'>See all ETFs</Button></Link>
               <Link href="/pages/news"><Button className='ml-5 bg-green-600'>Global News</Button></Link>
               <TabsContent value="gainers">
                 <StockList stocks={data.top_gainers} />
@@ -111,18 +124,6 @@ const HomePage = () => {
           </main>
         </div>
       </main>
-
-      {/* Bottom Navigation */}
-      {/* <nav className="fixed bottom-0 w-full bg-white border-t border-gray-200">
-        <div className="flex justify-around py-3">
-          {['Explore', 'Investments', 'Orders', 'Profile'].map((item) => (
-            <button key={item} className="flex flex-col items-center text-gray-600">
-              <div className="w-6 h-6 mb-1 bg-gray-200 rounded-full" />
-              <span className="text-xs">{item}</span>
-            </button>
-          ))}
-        </div>
-      </nav> */}
     </div>
   );
 };

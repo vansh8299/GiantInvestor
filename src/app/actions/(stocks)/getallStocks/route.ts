@@ -10,17 +10,17 @@ export async function GET() {
     const response = await fetch(url);
     const csvData = await response.text();
 
-    // Convert CSV to JSON
-    const rows = csvData.split("\n").slice(1); // Skip header row
+  
+    const rows = csvData.split("\n").slice(1); 
     const data = rows.map((row) => {
       const [symbol, name, exchange, assetType, ipoDate, delistingDate, status] = row.split(",");
       return { symbol, name, exchange, assetType, ipoDate, delistingDate, status };
     });
 
-    // Filter data for assetType === 'Stock'
-    const stockData = data.filter((item) => item.assetType === "Stock");
+    
+    // const stockData = data.filter((item) => item.assetType === "Stock");
 
-    return NextResponse.json({ success: true, data: stockData });
+    return NextResponse.json({ success: true, data: data });
   } catch (error) {
     console.error("Error fetching data:", error);
     return NextResponse.json({ success: false, error: "Failed to fetch data" }, { status: 500 });

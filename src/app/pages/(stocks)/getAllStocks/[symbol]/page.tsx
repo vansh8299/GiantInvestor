@@ -149,11 +149,12 @@ const StockDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-green-500"></div>
       </div>
     );
   }
+
 
   if (error) {
     return <div>Error: {error}</div>;
@@ -173,18 +174,21 @@ const StockDetailPage = () => {
             </button>
           </SheetTrigger>
           <SheetContent side="left">
-            <SheetHeader className="mt-28">
-              <SheetTitle className="text-3xl mb-4">Giant Investor</SheetTitle>
-              <SheetDescription className="mt-8 text-lg">Explore More</SheetDescription>
+            <SheetHeader className="mt-14">
+              <SheetTitle className="text-3xl">Giant Investor</SheetTitle>
+              <SheetDescription className="text-lg">Explore More</SheetDescription>
        
             </SheetHeader>
-            <div className="py-6">
-              <nav className="space-y-4 mt-10">
-             
+            <div className="py-3">
+              <nav className="space-y-2">
+              <a href={`/pages/getAllStocks/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Performance</a>
                 <a href={`/pages/companydetail/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Company Overview</a>
-                <a href={`/pages/ETF/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">ETF</a>
-                <a href="/settings" className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Settings</a>
-            
+                <a href={`/pages/Dividend/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Dividend</a>
+                <a href={`/pages/splits/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Splits</a>
+                <a href={`/pages/income/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Income</a>
+                <a href={`/pages/balancesheet/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Balance Sheet</a>
+                <a href={`/pages/cashFlow/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Cash Flow</a>
+                <a href={`/pages/earnings/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Earnings</a>
               </nav>
             </div>
           </SheetContent>

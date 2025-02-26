@@ -24,9 +24,10 @@ const SearchDropdown = () => {
         const result = await response.json();
         
         if (result.success) {
+          // Add null checks for name and symbol properties
           const filteredStocks = result.data.filter(stock =>
-            stock.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            stock.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+            (stock.name && stock.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (stock.symbol && stock.symbol.toLowerCase().includes(searchQuery.toLowerCase()))
           );
           setStocks(filteredStocks);
           setIsOpen(true);
@@ -61,9 +62,9 @@ const SearchDropdown = () => {
     }
   };
 
-  // Highlight matching text
+  // Highlight matching text with null check
   const highlightMatch = (text, query) => {
-    if (!query) return text;
+    if (!text || !query) return text || "";
     const regex = new RegExp(`(${query})`, 'gi');
     return text.split(regex).map((part, index) => 
       regex.test(part) ? (
@@ -72,6 +73,18 @@ const SearchDropdown = () => {
         part
       )
     );
+  };
+
+  // Function to determine the correct route based on stock properties
+  const getStockRoute = (stock) => {
+    // Check if stock.name or stock.assetType contains "ETF"
+    const isEtf = 
+      (stock.name && stock.name.toUpperCase().includes("ETF")) || 
+      (stock.assetType && stock.assetType.toUpperCase().includes("ETF"));
+    
+    return isEtf 
+      ? `/pages/getAllETFs/${stock.symbol}`
+      : `/pages/getAllStocks/${stock.symbol}`;
   };
 
   return (
@@ -101,10 +114,10 @@ const SearchDropdown = () => {
                 {stocks.length} results found
               </div>
               <div className="py-2">
-                {stocks.map((stock) => (
+                {stocks.map((stock, index) => (
                   <Link 
-                    key={stock.symbol} 
-                    href={`/pages/getAllStocks/${stock.symbol}`}
+                    key={index} 
+                    href={getStockRoute(stock)}
                     className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
                     onClick={() => {
                       setIsOpen(false);
