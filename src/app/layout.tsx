@@ -7,6 +7,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { usePathname } from "next/navigation";
 import { Providers } from "./providers";
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,6 +36,10 @@ export default function RootLayout({
           </SearchProvider>
         </Providers>
         <Toaster richColors />
+        <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+      />
       </body>
     </html>
   );

@@ -9,23 +9,37 @@ datasource db {
 
 
 model User {
-  id                      String   @id @default(cuid())
+  id                      String       @id @default(cuid())
   firstName               String
   lastName                String
-  email                   String   @unique
+  email                   String       @unique
   password                String
   otp                     String?
   otpExpiry               DateTime?
   emailVerified           DateTime?
-  passwordResetRequested  Boolean   @default(false)
-  passwordResetVerified   Boolean   @default(false)
-  isVerified              Boolean   @default(false)
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  passwordResetRequested  Boolean      @default(false)
+  passwordResetVerified   Boolean      @default(false)
+  isVerified              Boolean      @default(false)
+  balance                 Float        @default(0)
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
   image                   String?
   accounts                Account[]
   sessions                Session[]
+  transactions            Transaction[]
+}
 
+model Transaction {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  amount            Float
+  type              String    // "deposit", "withdrawal", etc.
+  status            String    // "pending", "completed", "failed"
+  razorpayPaymentId String?
+  razorpayOrderId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 model Account {
   id                 String  @id @default(cuid())

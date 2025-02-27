@@ -44,7 +44,6 @@ const GetAllStocks = () => {
     fetchStocks();
   }, []);
 
-  // Filter stocks based on search query - with null check
   const filteredStocks = stocks
 
   const indexOfLastItem = currentPage * itemsPerPage;

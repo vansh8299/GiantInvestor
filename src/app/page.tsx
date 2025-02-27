@@ -1,12 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import React from 'react';
-import { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useEffect } from 'react';
 import { Wallet, Gift } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from "next/link";
 import { Button } from '@/components/ui/button';
 import ReferralModal from '@/components/ReferModal';
+import AddMoneyModal from '@/components/AddMoneyModal';
 
 type Stock = {
   ticker: string;
@@ -24,6 +26,7 @@ const HomePage = () => {
   const [data, setData] = useState<ApiResponse>({ top_gainers: [], top_losers: [], most_actively_traded: [] });
   const [loading, setLoading] = useState(true);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [isAddMoneyModalOpen, setIsAddMoneyModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -41,6 +44,103 @@ const HomePage = () => {
     fetchData();
   }, []);
 
+  const handleAddMoney = async (amount: number) => {
+    try {
+      // Step 1: Create a transaction and get the order ID
+      const response = await fetch('/actions/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: 'cm7n56a9h0001lhkci8p9a677', // Replace with actual user ID
+          amount,
+          type: 'deposit',
+          status: 'pending',
+        }),
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to create transaction');
+      }
+  
+      const orderData = await response.json();
+      
+      if (!orderData.success || !orderData.transaction || !orderData.orderId) {
+        throw new Error('Invalid order data received');
+      }
+  
+      const transactionId = orderData.transaction.id;
+      
+      // Step 2: Initialize Razorpay
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: amount * 100, // Razorpay expects amount in paise
+        currency: "INR",
+        name: "Your Company Name",
+        description: "Add Money to Wallet",
+        order_id: orderData.orderId, // Make sure this is passed from the backend
+        handler: function(response: any) {
+          // Step 3: Verify the payment
+          verifyPayment(response, transactionId);
+        },
+        prefill: {
+          name: "User Name",
+          email: "user@example.com",
+        },
+        theme: {
+          color: "#3399cc",
+        },
+      };
+    
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (error) {
+      console.error('Error in payment process:', error);
+      alert('Payment process failed: ' + error);
+    }
+  };
+  
+  // Separate function to verify payment
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const verifyPayment = async (response: any, transactionId: string) => {
+    try {
+      // Make sure all required fields are present
+      if (!response.razorpay_payment_id || !response.razorpay_order_id || !response.razorpay_signature) {
+        throw new Error('Incomplete payment details received from Razorpay');
+      }
+  
+      const verifyResponse = await fetch('/actions/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_signature: response.razorpay_signature,
+          transactionId,
+        }),
+      });
+  
+      if (!verifyResponse.ok) {
+        throw new Error('Payment verification request failed');
+      }
+  
+      const verifyResult = await verifyResponse.json();
+  
+      if (!verifyResult.success) {
+        throw new Error(verifyResult.error || 'Payment verification failed');
+      }
+  
+      // Payment successful
+      alert('Payment successful!');
+      setIsAddMoneyModalOpen(false);
+    } catch (error) {
+      console.error('Error verifying payment:', error);
+      alert('Payment verification failed: ' + error);
+    }
+  };
   const stockIndices = [
     { name: 'NIFTY 50', value: '22,419.50', change: '+0.45%', isPositive: true },
     { name: 'SENSEX', value: '73,821.20', change: '+0.38%', isPositive: true },
@@ -59,11 +159,17 @@ const HomePage = () => {
     <div className="min-h-screen bg-white">
       {/* Toaster for notifications */}
   
-      
       {/* Referral Modal */}
       <ReferralModal 
         isOpen={isReferralModalOpen} 
         onClose={() => setIsReferralModalOpen(false)} 
+      />
+
+      {/* Add Money Modal */}
+      <AddMoneyModal 
+        isOpen={isAddMoneyModalOpen} 
+        onClose={() => setIsAddMoneyModalOpen(false)} 
+        onProceed={handleAddMoney}
       />
       
       {/* Main Content */}
@@ -86,7 +192,10 @@ const HomePage = () => {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <button className="flex items-center justify-center gap-2 bg-green-600 text-white rounded-lg py-3">
+          <button 
+            className="flex items-center justify-center gap-2 bg-green-600 text-white rounded-lg py-3"
+            onClick={() => setIsAddMoneyModalOpen(true)}
+          >
             <Wallet className="w-5 h-5" />
             Add Money
           </button>
