@@ -6,8 +6,8 @@ export async function GET(request: Request, { params }: { params: { symbol: stri
     const {symbol} = await params; 
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const apiKey = 'demo'; // Replace with your actual API key
-    const url = `https://www.alphavantage.co/query?function=SPLITS&symbol=${symbol}&apikey=demo`;
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY; 
+    const url = `https://www.alphavantage.co/query?function=SPLITS&symbol=${symbol}&apikey=${apiKey}`;
 
     try {
         const response = await fetch(url);

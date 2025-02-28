@@ -10,8 +10,8 @@ export async function GET(request: Request) {
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const apiKey = 'demo'; // Replace with your actual API key
-    const apiUrl = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${keywords}&apikey=demo`;
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;  // Replace with your actual API key
+    const apiUrl = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${keywords}&apikey=${apiKey}`;
 
     const response = await fetch(apiUrl);
     const data = await response.json();

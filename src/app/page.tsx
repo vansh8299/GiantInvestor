@@ -1,15 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import React, { useState } from 'react';
-import { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Wallet, Gift } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from "next/link";
 import { Button } from '@/components/ui/button';
 import ReferralModal from '@/components/ReferModal';
 import AddMoneyModal from '@/components/AddMoneyModal';
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { Toaster, toast } from 'sonner'; 
 type Stock = {
   ticker: string;
   price: string;
@@ -22,12 +22,22 @@ type ApiResponse = {
   most_actively_traded: Stock[];
 };
 
+type UserData = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  // other user properties
+};
+
 const HomePage = () => {
   const [data, setData] = useState<ApiResponse>({ top_gainers: [], top_losers: [], most_actively_traded: [] });
   const [loading, setLoading] = useState(true);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [isAddMoneyModalOpen, setIsAddMoneyModalOpen] = useState(false);
-
+  const [userData, setUserData] = useState<UserData | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -41,11 +51,34 @@ const HomePage = () => {
       }
     };
 
+    const fetchUserData = async () => {
+      try {
+        // Fetch the user details from our API route
+        const response = await fetch('/actions/getuser');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
+        }
+        
+        const userData = await response.json();
+        setUserData(userData.user);
+        console.log('Current user ID:', userData.user.id);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
     fetchData();
+    fetchUserData();
   }, []);
 
   const handleAddMoney = async (amount: number) => {
     try {
+      // Make sure we have the user ID from the session
+      if (!userData || !userData.id) {
+        throw new Error('User not logged in or ID not available');
+      }
+  
       // Step 1: Create a transaction and get the order ID
       const response = await fetch('/actions/create', {
         method: 'POST',
@@ -53,7 +86,7 @@ const HomePage = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: 'cm7n56a9h0001lhkci8p9a677', // Replace with actual user ID
+          userId: userData.id, // Use the user ID from the session
           amount,
           type: 'deposit',
           status: 'pending',
@@ -77,16 +110,17 @@ const HomePage = () => {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: amount * 100, // Razorpay expects amount in paise
         currency: "INR",
-        name: "Your Company Name",
+        name: "Giant Investor",
         description: "Add Money to Wallet",
-        order_id: orderData.orderId, // Make sure this is passed from the backend
+        order_id: orderData.orderId, 
         handler: function(response: any) {
-          // Step 3: Verify the payment
+          setIsAddMoneyModalOpen(false);
+          setIsVerifyingPayment(true); // Show verification spinner
           verifyPayment(response, transactionId);
         },
         prefill: {
-          name: "User Name",
-          email: "user@example.com",
+          name: userData.firstName + ' ' + userData.lastName,
+          email: userData.email,
         },
         theme: {
           color: "#3399cc",
@@ -101,11 +135,9 @@ const HomePage = () => {
     }
   };
   
-  // Separate function to verify payment
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
   const verifyPayment = async (response: any, transactionId: string) => {
     try {
-      // Make sure all required fields are present
       if (!response.razorpay_payment_id || !response.razorpay_order_id || !response.razorpay_signature) {
         throw new Error('Incomplete payment details received from Razorpay');
       }
@@ -134,11 +166,12 @@ const HomePage = () => {
       }
   
       // Payment successful
-      alert('Payment successful!');
-      setIsAddMoneyModalOpen(false);
+      toast.success('Payment successful!'); // Use Sonner for success message
     } catch (error) {
       console.error('Error verifying payment:', error);
-      alert('Payment verification failed: ' + error);
+      toast.error('Payment verification failed: ' + error); // Use Sonner for error message
+    } finally {
+      setIsVerifyingPayment(false); // Hide verification spinner
     }
   };
   const stockIndices = [
@@ -154,11 +187,17 @@ const HomePage = () => {
       </div>
     );
   }
-
+  if (isVerifyingPayment) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
   return (
-    <div className="min-h-screen bg-white">
-      {/* Toaster for notifications */}
-  
+    <div className="min-h-screen bg-green-50">
+     
+
       {/* Referral Modal */}
       <ReferralModal 
         isOpen={isReferralModalOpen} 
@@ -166,11 +205,11 @@ const HomePage = () => {
       />
 
       {/* Add Money Modal */}
-      <AddMoneyModal 
-        isOpen={isAddMoneyModalOpen} 
-        onClose={() => setIsAddMoneyModalOpen(false)} 
-        onProceed={handleAddMoney}
-      />
+    <AddMoneyModal 
+  isOpen={isAddMoneyModalOpen} 
+  onClose={() => setIsAddMoneyModalOpen(false)} 
+  onProceed={handleAddMoney}
+/>
       
       {/* Main Content */}
       <main className="pt-28 px-4">

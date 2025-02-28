@@ -2,11 +2,12 @@
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request, { params }: { params: { symbol: string } }) {
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY; 
   const { symbol } =  await params;
   console.log('Symbol:', symbol);
 
   // Construct the API URL with the provided symbol
-  const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${symbol}&outputsize=full&apikey=demo`;
+  const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${symbol}&outputsize=full&apikey=${apiKey}`;
 
   try {
     // Fetch data from the Alpha Vantage API

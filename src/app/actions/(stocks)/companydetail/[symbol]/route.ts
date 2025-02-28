@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request: Request, { params }: { params: { symbol: string } }) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const apiKey = 'demo'; // Replace with your Alpha Vantage API key
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY; // Replace with your Alpha Vantage API key
     const { symbol } = params;
     console.log('Symbol:', symbol);
-    const url = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=demo`;
+    const url = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apiKey}`;
 
     try {
         // Fetch data from Alpha Vantage API

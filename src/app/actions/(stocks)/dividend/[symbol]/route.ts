@@ -6,11 +6,11 @@ export async function GET(request: Request, { params }: { params: { symbol: stri
 
   const {symbol} = await params; 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const apiKey = process.env.ALPHA_VANTAGE_API_KEY 
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY; 
 
   try {
     const response = await fetch(
-      `https://www.alphavantage.co/query?function=DIVIDENDS&symbol=${symbol}&apikey=demo`
+      `https://www.alphavantage.co/query?function=DIVIDENDS&symbol=${symbol}&apikey=${apiKey}`
     );
 
     if (!response.ok) {

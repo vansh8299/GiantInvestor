@@ -2,6 +2,7 @@
 
 import { Inter } from "next/font/google";
 import Header from "@/components/header";
+import Footer from "@/components//footer"
 import { SearchProvider } from "@/context/SearchContext";
 import "./globals.css";
 import { Toaster } from "sonner";
@@ -33,6 +34,7 @@ export default function RootLayout({
           <SearchProvider>
             {!isAuthPage && <Header />}
             <main className="min-h-screen">{children}</main>
+            {!isAuthPage && <Footer />}
           </SearchProvider>
         </Providers>
         <Toaster richColors />

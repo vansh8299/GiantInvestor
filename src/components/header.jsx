@@ -29,37 +29,37 @@ const Header = () => {
     checkAuth();
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      // Remove all cookies related to authentication
-      cookies.remove('token');
-      cookies.remove('next-auth.session-token');
-      cookies.remove('next-auth.csrf-token');
-      cookies.remove('next-auth.callback-url');
+  // const handleLogout = async () => {
+  //   try {
+  //     // Remove all cookies related to authentication
+  //     cookies.remove('token');
+  //     cookies.remove('next-auth.session-token');
+  //     cookies.remove('next-auth.csrf-token');
+  //     cookies.remove('next-auth.callback-url');
       
-      // Also remove cookies in case they were set with different domains/paths
-      cookies.remove('token', { path: '/' });
-      cookies.remove('next-auth.session-token', { path: '/' });
-      cookies.remove('next-auth.csrf-token', { path: '/' });
-      cookies.remove('next-auth.callback-url', { path: '/' });
+  //     // Also remove cookies in case they were set with different domains/paths
+  //     cookies.remove('token', { path: '/' });
+  //     cookies.remove('next-auth.session-token', { path: '/' });
+  //     cookies.remove('next-auth.csrf-token', { path: '/' });
+  //     cookies.remove('next-auth.callback-url', { path: '/' });
 
-      // Sign out from NextAuth
-      await signOut({ 
-        callbackUrl: '/pages/login',
-        redirect: false 
-      });
+  //     // Sign out from NextAuth
+  //     await signOut({ 
+  //       callbackUrl: '/pages/login',
+  //       redirect: false 
+  //     });
 
-      // Clear any local storage items if you're using them
-      localStorage.clear();
+  //     // Clear any local storage items if you're using them
+  //     localStorage.clear();
       
-      // Force a hard redirect to ensure complete session cleanup
-      window.location.href = '/pages/login';
-    } catch (error) {
-      console.error('Error during logout:', error);
-      // Fallback redirect in case of error
-      window.location.href = '/pages/login';
-    }
-  };
+  //     // Force a hard redirect to ensure complete session cleanup
+  //     window.location.href = '/pages/login';
+  //   } catch (error) {
+  //     console.error('Error during logout:', error);
+  //     // Fallback redirect in case of error
+  //     window.location.href = '/pages/login';
+  //   }
+  // };
 
   return (
     <nav className="fixed top-0 w-full bg-white border-b border-gray-200 z-10">
@@ -70,8 +70,8 @@ const Header = () => {
         <SearchDropdown />
         <div className="flex items-center gap-4">
         {(token || googletoken || session) ? (
-            <Button onClick={handleLogout} className="bg-green-600">
-              Logout
+            <Button className="bg-green-600">
+              About
             </Button>
           ) : (
             <>

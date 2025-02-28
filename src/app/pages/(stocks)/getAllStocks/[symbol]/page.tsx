@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -12,7 +12,6 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
-  
 } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
 
@@ -31,7 +30,7 @@ interface OptionsData {
 const StockDetailPage = () => {
   const { symbol } = useParams();
   const [intradayData, setIntradayData] = useState<{ time: string; price: number }[]>([]);
-  const [dailyData, setDailyData] = useState<{ date: string; price: number }[]>([]);
+  const [dailyData, setDailyData] = useState<{ date: string; price: number; adjustedClose: number }[]>([]);
   const [weeklyData, setWeeklyData] = useState<{ date: string; price: number; volume: string; dividend: string }[]>([]);
   const [monthlyData, setMonthlyData] = useState<{ date: string; price: number; volume: string; dividend: string }[]>([]);
   const [optionsData, setOptionsData] = useState<OptionsData[]>([]);
@@ -75,15 +74,19 @@ const StockDetailPage = () => {
         setExpirationDates(uniqueExpirations);
         setSelectedExpiration(uniqueExpirations[0] || "");
 
+        // Transform daily data to include adjusted close price
+        const formattedDailyData = Object.entries(dailyData["Time Series (Daily)"]).map(([date, values]) => ({
+          date,
+          price: parseFloat((values as { "4. close": string })["4. close"]),
+          adjustedClose: parseFloat((values as { "5. adjusted close": string })["5. adjusted close"]),
+        }));
+
+        setDailyData(formattedDailyData);
+
         // Previous data transformations remain the same
         const formattedIntradayData = Object.entries(intradayData["Time Series (5min)"]).map(([time, values]) => ({
           time,
           price: parseFloat((values as { "1. open": string })["1. open"]),
-        }));
-
-        const formattedDailyData = Object.entries(dailyData["Time Series (Daily)"]).map(([date, values]) => ({
-          date,
-          price: parseFloat((values as { "4. close": string })["4. close"]),
         }));
 
         const formattedWeeklyData = Object.entries(weeklyData["Weekly Adjusted Time Series"]).map(([date, values]) => {
@@ -107,7 +110,6 @@ const StockDetailPage = () => {
         });
 
         setIntradayData(formattedIntradayData);
-        setDailyData(formattedDailyData);
         setWeeklyData(formattedWeeklyData);
         setMonthlyData(formattedMonthlyData);
 
@@ -155,13 +157,14 @@ const StockDetailPage = () => {
     );
   }
 
-
   if (error) {
     return <div>Error: {error}</div>;
   }
 
+  const latestAdjustedClose = dailyData.length > 0 ? dailyData[0].adjustedClose : "N/A";
+
   return (
-    <div className="min-h-screen bg-gray-200">
+    <div className="min-h-screen bg-green-50">
       {/* Add the drawer in the top-left corner with proper accessibility */}
       <div className="fixed top-24 left-4 z-50 bg-gray-200">
         <Sheet>
@@ -177,11 +180,10 @@ const StockDetailPage = () => {
             <SheetHeader className="mt-14">
               <SheetTitle className="text-3xl">Giant Investor</SheetTitle>
               <SheetDescription className="text-lg">Explore More</SheetDescription>
-       
             </SheetHeader>
             <div className="py-3">
               <nav className="space-y-2">
-              <a href={`/pages/getAllStocks/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Performance</a>
+                <a href={`/pages/getAllStocks/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Performance</a>
                 <a href={`/pages/companydetail/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Company Overview</a>
                 <a href={`/pages/Dividend/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Dividend</a>
                 <a href={`/pages/splits/${symbol}`} className="text-xl mt-8 pb-6 block text-green-600 hover:underline">Splits</a>
@@ -194,11 +196,24 @@ const StockDetailPage = () => {
           </SheetContent>
         </Sheet>
       </div>
-      
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-center mb-8 mt-16">
-          Stock Details for {symbol}
-        </h1>
+  <h1 className="text-3xl font-bold text-center mb-4 mt-16">
+    Stock Details for {symbol}
+  </h1>
+  <div className="flex justify-between items-center mb-8 mt-10">
+    <p className="text-2xl font-semibold text-green-600">
+     Price: <span className="font-bold">{latestAdjustedClose}</span>
+    </p>
+    <div className="flex space-x-2">
+      <button className="px-10 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
+       Buy
+      </button>
+      <button className="px-10 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">
+        Sell
+      </button>
+    </div>
+  </div>
+
 
         <Tabs defaultValue="intraday" className="w-full">
           <TabsList className="grid w-full grid-cols-5">

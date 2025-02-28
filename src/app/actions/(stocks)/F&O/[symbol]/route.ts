@@ -29,10 +29,10 @@ export async function GET(request: Request, { params }: { params: { symbol: stri
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY; 
     
     const response = await fetch(
-      `https://www.alphavantage.co/query?function=HISTORICAL_OPTIONS&symbol=${symbol}&apikey=demo`
+      `https://www.alphavantage.co/query?function=HISTORICAL_OPTIONS&symbol=${symbol}&apikey=${apiKey}`
     );
 
     if (!response.ok) {

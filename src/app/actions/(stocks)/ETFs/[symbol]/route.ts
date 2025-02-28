@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request: Request, { params }: { params: { symbol: string } }) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const apiKey = 'demo'; 
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY; 
     const {symbol} = await params; 
-    const url = `https://www.alphavantage.co/query?function=ETF_PROFILE&symbol=${symbol}&apikey=demo`;
+    const url = `https://www.alphavantage.co/query?function=ETF_PROFILE&symbol=${symbol}&apikey=${apiKey}`;
 
     try {
         const response = await fetch(url);

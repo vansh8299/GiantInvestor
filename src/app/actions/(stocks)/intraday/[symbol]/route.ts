@@ -2,12 +2,13 @@
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request, { params }: { params: { symbol: string } }) {
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY; 
   const { symbol } =await params;
   console.log('Symbol:', symbol);
 
   // Replace with your actual API key or use environment variables
 //   const apiKey = 'demo';
-  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=5min&apikey=demo`;
+  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=5min&apikey=${apiKey}`;
 
   try {
     const response = await fetch(url);
