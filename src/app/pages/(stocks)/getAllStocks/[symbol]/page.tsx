@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -14,6 +14,9 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast, Toaster } from "sonner"; // Import Sonner
 
 interface OptionsData {
   contractID: string;
@@ -30,7 +33,7 @@ interface OptionsData {
 const StockDetailPage = () => {
   const { symbol } = useParams();
   const [intradayData, setIntradayData] = useState<{ time: string; price: number }[]>([]);
-  const [dailyData, setDailyData] = useState<{ date: string; price: number; adjustedClose: number }[]>([]);
+  const [dailyData, setDailyData] = useState<{ date: string; price: number; adjustedClose: number; dividendAmount?: string; volume?: string; splitCoefficient?: string }[]>([]);
   const [weeklyData, setWeeklyData] = useState<{ date: string; price: number; volume: string; dividend: string }[]>([]);
   const [monthlyData, setMonthlyData] = useState<{ date: string; price: number; volume: string; dividend: string }[]>([]);
   const [optionsData, setOptionsData] = useState<OptionsData[]>([]);
@@ -42,8 +45,13 @@ const StockDetailPage = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [actionType, setActionType] = useState<"buy" | "sell">("buy");
+  const [quantity, setQuantity] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const ITEMS_PER_PAGE = 10;
-  
+
   useEffect(() => {
     const fetchAllData = async () => {
       try {
@@ -67,61 +75,70 @@ const StockDetailPage = () => {
           optionsRes.json()
         ]);
 
-        // Transform options data and extract unique expiration dates
-        const formattedOptionsData = optionsData.data as OptionsData[];
-        const uniqueExpirations = [...new Set(formattedOptionsData.map(option => option.expiration))].sort();
-        setOptionsData(formattedOptionsData);
-        setExpirationDates(uniqueExpirations);
-        setSelectedExpiration(uniqueExpirations[0] || "");
+        // Transform intraday data
+        const formattedIntradayData = intradayData["Time Series (5min)"] ? Object.entries(intradayData["Time Series (5min)"]).map(([time, values]) => ({
+          time,
+          price: parseFloat((values as { "1. open": string })["1. open"]),
+        })) : [];
 
-        // Transform daily data to include adjusted close price
-        const formattedDailyData = Object.entries(dailyData["Time Series (Daily)"]).map(([date, values]) => ({
+        setIntradayData(formattedIntradayData);
+
+        // Transform daily data
+        const formattedDailyData = dailyData["Time Series (Daily)"] ? Object.entries(dailyData["Time Series (Daily)"]).map(([date, values]) => ({
           date,
           price: parseFloat((values as { "4. close": string })["4. close"]),
-          adjustedClose: parseFloat((values as { "5. adjusted close": string })["5. adjusted close"]),
-        }));
+          adjustedClose: parseFloat((values as { "5. adjusted close": string })["5. adjusted close"] || "0"),
+        })) : [];
 
         setDailyData(formattedDailyData);
 
-        // Previous data transformations remain the same
-        const formattedIntradayData = Object.entries(intradayData["Time Series (5min)"]).map(([time, values]) => ({
-          time,
-          price: parseFloat((values as { "1. open": string })["1. open"]),
-        }));
+        // Transform weekly data
+        const formattedWeeklyData = weeklyData["Weekly Adjusted Time Series"] ? Object.entries(weeklyData["Weekly Adjusted Time Series"]).map(([date, values]) => ({
+          date,
+          price: parseFloat((values as { "4. close": string })["4. close"]),
+          volume: (values as { "6. volume": string })["6. volume"] || "0",
+          dividend: (values as { "7. dividend amount": string })["7. dividend amount"] || "0.0000",
+        })) : [];
 
-        const formattedWeeklyData = Object.entries(weeklyData["Weekly Adjusted Time Series"]).map(([date, values]) => {
-          const typedValues = values as { "4. close": string; "6. volume": string; "7. dividend amount": string };
-          return {
-            date,
-            price: parseFloat(typedValues["4. close"]),
-            volume: typedValues["6. volume"],
-            dividend: typedValues["7. dividend amount"]
-          };
-        });
-
-        const formattedMonthlyData = Object.entries(monthlyData["Monthly Adjusted Time Series"]).map(([date, values]) => {
-          const typedValues = values as { "4. close": string; "6. volume": string; "7. dividend amount": string };
-          return {
-            date,
-            price: parseFloat(typedValues["4. close"]),
-            volume: typedValues["6. volume"],
-            dividend: typedValues["7. dividend amount"]
-          };
-        });
-
-        setIntradayData(formattedIntradayData);
         setWeeklyData(formattedWeeklyData);
+
+        // Transform monthly data
+        const formattedMonthlyData = monthlyData["Monthly Adjusted Time Series"] ? Object.entries(monthlyData["Monthly Adjusted Time Series"]).map(([date, values]) => ({
+          date,
+          price: parseFloat((values as { "4. close": string })["4. close"]),
+          volume: (values as { "6. volume": string })["6. volume"] || "0",
+          dividend: (values as { "7. dividend amount": string })["7. dividend amount"] || "0.0000",
+        })) : [];
+
         setMonthlyData(formattedMonthlyData);
 
+        // Transform options data
+        const formattedOptionsData: OptionsData[] = optionsData.data ? optionsData.data.map((option: OptionsData) => ({
+          contractID: option.contractID,
+          expiration: option.expiration,
+          strike: option.strike,
+          type: option.type,
+          last: option.last,
+          mark: option.mark,
+          volume: option.volume,
+          open_interest: option.open_interest,
+          implied_volatility: option.implied_volatility,
+        })) : [];
+
+        setOptionsData(formattedOptionsData);
+        setExpirationDates([...new Set(formattedOptionsData.map((option: OptionsData) => option.expiration))].sort() as string[]);
+        setSelectedExpiration(formattedOptionsData[0]?.expiration || "");
+
         // Set latest metrics from daily data
-        const latestDailyEntry = Object.values(dailyData["Time Series (Daily)"])[0] as {
-          "7. dividend amount": string;
-          "6. volume": string;
-          "8. split coefficient": string;
+        const latestDailyEntry = formattedDailyData[0] as { date: string; price: number; adjustedClose: number; dividendAmount?: string; volume?: string; splitCoefficient?: string } || {
+          dividendAmount: "0.0000",
+          volume: "0",
+          splitCoefficient: "1.0",
         };
-        setDividend(latestDailyEntry["7. dividend amount"]);
-        setVolume(latestDailyEntry["6. volume"]);
-        setSplit(latestDailyEntry["8. split coefficient"]);
+
+        setDividend(latestDailyEntry.dividendAmount || "0.0000");
+        setVolume(latestDailyEntry.volume || "0");
+        setSplit(latestDailyEntry.splitCoefficient || "1.0");
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
@@ -149,6 +166,52 @@ const StockDetailPage = () => {
     }));
   };
 
+  const handleBuySellClick = (type: "buy" | "sell") => {
+    setActionType(type);
+    setIsDrawerOpen(true);
+  };
+
+  const handleQuantityChange = (delta: number) => {
+    setQuantity(prev => Math.max(1, prev + delta));
+  };
+
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      
+      const response = await fetch('/actions/investment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symbol: symbol,
+          quantity: quantity,
+          price: latestAdjustedClose,
+          actionType: actionType,
+        }),
+      });
+  
+      const data = await response.json();
+      
+      if (!response.ok) {
+        // Show error toast
+        toast.error(data.error || 'Transaction failed');
+      } else {
+        // Show success toast
+        toast.success(data.message);
+        setIsDrawerOpen(false);
+        setQuantity(1);
+      }
+    } catch (error) {
+      console.error('Transaction error:', error);
+      // Show error toast
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -166,6 +229,7 @@ const StockDetailPage = () => {
   return (
     <div className="min-h-screen bg-green-50">
       {/* Add the drawer in the top-left corner with proper accessibility */}
+      <Toaster position="bottom-right" />
       <div className="fixed top-24 left-4 z-50 bg-gray-200">
         <Sheet>
           <SheetTrigger asChild>
@@ -197,24 +261,66 @@ const StockDetailPage = () => {
         </Sheet>
       </div>
       <div className="max-w-7xl mx-auto px-4 py-8">
-  <h1 className="text-3xl font-bold text-center mb-4 mt-16">
-    Stock Details for {symbol}
-  </h1>
-  <div className="flex justify-between items-center mb-8 mt-10">
-    <p className="text-2xl font-semibold text-green-600">
-     Price: <span className="font-bold">{latestAdjustedClose}</span>
-    </p>
-    <div className="flex space-x-2">
-      <button className="px-10 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
-       Buy
-      </button>
-      <button className="px-10 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">
-        Sell
-      </button>
-    </div>
-  </div>
+        <h1 className="text-3xl font-bold text-center mb-4 mt-16">
+          Stock Details for {symbol}
+        </h1>
+        <div className="flex justify-between items-center mb-8 mt-10">
+          <p className="text-2xl font-semibold text-green-600">
+            Price: <span className="font-bold">{latestAdjustedClose}</span>
+          </p>
+          <div className="flex space-x-2">
+            <Button onClick={() => handleBuySellClick("buy")} className="px-10 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
+              Buy
+            </Button>
+            <Button onClick={() => handleBuySellClick("sell")} className="px-10 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">
+              Sell
+            </Button>
+          </div>
+        </div>
 
+        {/* Buy/Sell Drawer */}
+        <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+          <SheetContent side="bottom" className="h-[35vh]">
+            <SheetHeader>
+              <SheetTitle>{actionType === "buy" ? "Buy" : "Sell"} {symbol}</SheetTitle>
+              
+              <SheetDescription>
+              <div>
+  <p>
+   <span className="font-bold mb-8 text-lg text-green-500"> Price: {latestAdjustedClose}</span>
+  </p>
+  <p className="text-base">Enter the quantity you want to {actionType}.</p>
+</div>
 
+           
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-6">
+              <div className="flex items-center justify-between">
+                <Button onClick={() => handleQuantityChange(-1)} variant="outline" size="sm">
+                  -
+                </Button>
+                <Input
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  className="mx-2 text-center"
+                  min="1"
+                />
+                <Button onClick={() => handleQuantityChange(1)} variant="outline" size="sm">
+                  +
+                </Button>
+              </div>
+              <Button 
+  onClick={handleSubmit} 
+  className={`w-full mt-4 ${actionType === "buy" ? "bg-green-500" : "bg-red-500"} text-white`}
+>
+{isSubmitting ? "Processing..." : actionType === "buy" ? "Buy" : "Sell"}
+</Button>
+
+            </div>
+          </SheetContent>
+        </Sheet>
         <Tabs defaultValue="intraday" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="intraday">Intraday</TabsTrigger>
@@ -443,6 +549,7 @@ const StockDetailPage = () => {
           </TabsContent>
         </Tabs>
       </div>
+
     </div>
   );
 };

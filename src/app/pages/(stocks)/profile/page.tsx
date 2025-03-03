@@ -133,7 +133,7 @@ const Profile: NextPage = () => {
 
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Balance</span>
-              <span className="font-semibold text-gray-800">₹{user.balance.toFixed(2)}</span>
+              <span className="font-semibold text-gray-800">${user.balance.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Member Since</span>

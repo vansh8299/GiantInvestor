@@ -79,3 +79,6 @@ body {
   border-top-color: #3eca49;
   animation: spin 1s linear infinite;
 }
+body {
+  @apply bg-green-50;
+}

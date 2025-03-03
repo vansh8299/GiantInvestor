@@ -14,7 +14,7 @@ const Footer = () => {
         </button></Link>
 
         {/* Investments Button */}
-        <Link href="/pages/investments"> <button className="flex flex-col items-center text-gray-600 hover:text-green-500 transition-colors">
+        <Link href="/pages/portfolio"> <button className="flex flex-col items-center text-gray-600 hover:text-green-500 transition-colors">
           <FaChartLine className="w-6 h-6 mb-1" />
           <span className="text-xs">Investments</span>
         </button></Link>
