@@ -120,7 +120,8 @@ const Portfolio: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showError, setShowError] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const router = useRouter()
+  const [dailyData, setDailyData] = useState<{ date: string; price: number; adjustedClose: number; dividendAmount?: string; volume?: string; splitCoefficient?: string }[]>([]);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchUserStocks = async () => {
@@ -133,8 +134,19 @@ const Portfolio: React.FC = () => {
         }
 
         const { data } = await response.json();
-        setStocks(data.stocks);
-        setPortfolioStats(data.portfolioStats);
+        const updatedStocks = await Promise.all(data.stocks.map(async (stock: Stock) => {
+          const dailyRes = await fetch(`/actions/daily/${stock.symbol}`);
+          if (!dailyRes.ok) {
+            throw new Error('Failed to fetch daily data');
+          }
+          const dailyData = await dailyRes.json();
+          const timeSeriesDaily = dailyData["Time Series (Daily)"] as Record<string, { "5. adjusted close": string }> | undefined;
+          const latestAdjustedClose = timeSeriesDaily ? parseFloat(Object.values(timeSeriesDaily)[0]["5. adjusted close"]) : stock.currentPrice;
+          return { ...stock, currentPrice: latestAdjustedClose };
+        }));
+
+        setStocks(updatedStocks);
+        setPortfolioStats(calculatePortfolioStats(updatedStocks));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
@@ -144,6 +156,22 @@ const Portfolio: React.FC = () => {
 
     fetchUserStocks();
   }, []);
+
+  const calculatePortfolioStats = (stocks: Stock[]): PortfolioStats => {
+    const totalInvestment = stocks.reduce((sum, stock) => sum + stock.quantity * stock.purchasePrice, 0);
+    const currentValue = stocks.reduce((sum, stock) => sum + stock.quantity * stock.currentPrice, 0);
+    const profitLoss = currentValue - totalInvestment;
+    const profitLossPercentage = (profitLoss / totalInvestment) * 100;
+    const stockCount = stocks.length;
+
+    return {
+      totalInvestment,
+      currentValue,
+      profitLoss,
+      profitLossPercentage,
+      stockCount,
+    };
+  };
 
   const handleQuantityChange = (delta: number) => {
     setQuantity(prev => Math.max(1, prev + delta));
@@ -176,7 +204,6 @@ const Portfolio: React.FC = () => {
         setSelectedStock(null); // Close the drawer
         setQuantity(1); // Reset quantity
         window.location.reload();
-        
       }
     } catch (error) {
       console.error('Transaction error:', error);
@@ -204,7 +231,7 @@ const Portfolio: React.FC = () => {
 
   return (
     <div className="container mx-auto py-8 mt-12 bg-green-50">
-            <Toaster position="bottom-right" />
+      <Toaster position="bottom-right" />
       <h1 className="text-3xl font-bold mb-6 text-green-600">My Portfolio</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -228,7 +255,7 @@ const Portfolio: React.FC = () => {
             <CardTitle
               className={`text-2xl ${portfolioStats.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}
             >
-              ${portfolioStats.profitLoss.toFixed(2)} ({portfolioStats.profitLossPercentage}%)
+              ${portfolioStats.profitLoss.toFixed(2)} ({portfolioStats.profitLossPercentage.toFixed(2)}%)
             </CardTitle>
           </CardHeader>
         </Card>
@@ -273,20 +300,19 @@ const Portfolio: React.FC = () => {
       {/* Stock Drawer */}
       <Sheet open={!!selectedStock} onOpenChange={() => setSelectedStock(null)}>
         <SheetContent side="bottom" className="h-[40vh]">
-        <SheetHeader>
-  <div className="flex items-center">
-    <SheetTitle className="text-green-600">{selectedStock?.symbol}</SheetTitle>
-    <a href={`/pages/getAllStocks/${selectedStock?.symbol}`} className="ml-2">
-      <ArrowRight size={24} />
-    </a>
-  </div>
-  <SheetDescription className="text-lg font-bold text-black">
-    Current Price: ${selectedStock?.currentPrice.toFixed(2)}
-  </SheetDescription>
-</SheetHeader>
+          <SheetHeader>
+            <div className="flex items-center">
+              <SheetTitle className="text-green-600">{selectedStock?.symbol}</SheetTitle>
+              <a href={`/pages/getAllStocks/${selectedStock?.symbol}`} className="ml-2">
+                <ArrowRight size={24} />
+              </a>
+            </div>
+            <SheetDescription className="text-lg font-bold text-black">
+              Current Price: ${selectedStock?.currentPrice.toFixed(2)}
+            </SheetDescription>
+          </SheetHeader>
           <div className="mt-4 text-base font-bold text-black">
             <p>Quantity: {selectedStock?.quantity}</p>
-            
             <div className="flex items-center justify-between mt-6">
               <Button onClick={() => handleQuantityChange(-1)} variant="outline" size="sm">
                 -
@@ -302,8 +328,8 @@ const Portfolio: React.FC = () => {
                 +
               </Button>
             </div>
-            <Button 
-              onClick={handleSubmit} 
+            <Button
+              onClick={handleSubmit}
               className={`w-full mt-4 ${actionType === "buy" ? "bg-green-500" : "bg-red-500"} text-white`}
               disabled={isSubmitting}
             >
@@ -312,8 +338,6 @@ const Portfolio: React.FC = () => {
           </div>
         </SheetContent>
       </Sheet>
-
-   
     </div>
   );
 };
