@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log(email)
+    console.log(password)
+
     const user = await prisma.user.findUnique({
       where: { email }
     });

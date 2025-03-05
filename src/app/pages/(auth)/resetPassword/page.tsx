@@ -61,7 +61,7 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      await axios.post('/actions/resetPassword', {
+      await axios.post('/api/reset', {
         email,
         password
       });
