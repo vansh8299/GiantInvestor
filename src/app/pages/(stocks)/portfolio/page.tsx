@@ -10,6 +10,8 @@ import { ArrowRight, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
+import { useSession } from "next-auth/react";
+import { OTPVerificationModal } from "@/components/OTPVerificationModal";
 
 interface Stock {
   id: string;
@@ -26,13 +28,19 @@ interface PortfolioStats {
   profitLossPercentage: number;
   stockCount: number;
 }
-
+interface TransactionDetails {
+  symbol: string;
+  quantity: number;
+  price: number;
+  actionType: 'buy' | 'sell';
+}
 interface StockTableProps {
   stocks: Stock[];
   onRowClick: (stock: Stock, actionType: "buy" | "sell") => void;
 }
 
 const StockTable: React.FC<StockTableProps> = ({ stocks, onRowClick }) => {
+  
   if (stocks.length === 0) {
     return <div className="text-center py-8 text-gray-500">No stocks found</div>;
   }
@@ -102,6 +110,7 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onRowClick }) => {
 };
 
 const Portfolio: React.FC = () => {
+  const { data: session } = useSession();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [portfolioStats, setPortfolioStats] = useState<PortfolioStats>({
     totalInvestment: 0,
@@ -120,31 +129,79 @@ const Portfolio: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showError, setShowError] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isOTPModalOpen, setIsOTPModalOpen] = useState(false);
+  const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
   const [dailyData, setDailyData] = useState<{ date: string; price: number; adjustedClose: number; dividendAmount?: string; volume?: string; splitCoefficient?: string }[]>([]);
   const router = useRouter();
 
   useEffect(() => {
+    // const fetchUserStocks = async () => {
+    //   try {
+    //     setLoading(true);
+    //     const response = await fetch('/actions/getStocks');
+
+    //     if (!response.ok) {
+    //       throw new Error('Failed to fetch portfolio data');
+    //     }
+
+    //     const { data } = await response.json();
+    //     const updatedStocks = await Promise.all(data.stocks.map(async (stock: Stock) => {
+    //       const dailyRes = await fetch(`/actions/daily/${stock.symbol}`);
+    //       if (!dailyRes.ok) {
+    //         throw new Error('Failed to fetch daily data');
+    //       }
+    //       const dailyData = await dailyRes.json();
+    //       const timeSeriesDaily = dailyData["Time Series (Daily)"] as Record<string, { "5. adjusted close": string }> | undefined;
+    //       const latestAdjustedClose = timeSeriesDaily ? parseFloat(Object.values(timeSeriesDaily)[0]["5. adjusted close"]) : stock.currentPrice;
+    //       return { ...stock, currentPrice: latestAdjustedClose };
+    //     }));
+
+    //     setStocks(updatedStocks);
+    //     setPortfolioStats(calculatePortfolioStats(updatedStocks));
+    //   } catch (err) {
+    //     setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    //   } finally {
+    //     setLoading(false);
+    //   }
+    // };
     const fetchUserStocks = async () => {
       try {
         setLoading(true);
         const response = await fetch('/actions/getStocks');
-
+    
         if (!response.ok) {
           throw new Error('Failed to fetch portfolio data');
         }
-
+    
         const { data } = await response.json();
         const updatedStocks = await Promise.all(data.stocks.map(async (stock: Stock) => {
+          let latestAdjustedClose = stock.currentPrice;
+    
+          // Try fetching daily data first
           const dailyRes = await fetch(`/actions/daily/${stock.symbol}`);
-          if (!dailyRes.ok) {
-            throw new Error('Failed to fetch daily data');
+          if (dailyRes.ok) {
+            const dailyData = await dailyRes.json();
+            const timeSeriesDaily = dailyData["Time Series (Daily)"] as Record<string, { "5. adjusted close": string }> | undefined;
+            if (timeSeriesDaily) {
+              latestAdjustedClose = parseFloat(Object.values(timeSeriesDaily)[0]["5. adjusted close"]);
+            }
           }
-          const dailyData = await dailyRes.json();
-          const timeSeriesDaily = dailyData["Time Series (Daily)"] as Record<string, { "5. adjusted close": string }> | undefined;
-          const latestAdjustedClose = timeSeriesDaily ? parseFloat(Object.values(timeSeriesDaily)[0]["5. adjusted close"]) : stock.currentPrice;
+    
+          // If daily data is not available, try fetching weekly data
+          if (latestAdjustedClose === stock.currentPrice) {
+            const weeklyRes = await fetch(`/actions/weekly/${stock.symbol}`);
+            if (weeklyRes.ok) {
+              const weeklyData = await weeklyRes.json();
+              const timeSeriesWeekly = weeklyData["Weekly Adjusted Time Series"] as Record<string, { "5. adjusted close": string }> | undefined;
+              if (timeSeriesWeekly) {
+                latestAdjustedClose = parseFloat(Object.values(timeSeriesWeekly)[0]["5. adjusted close"]);
+              }
+            }
+          }
+    
           return { ...stock, currentPrice: latestAdjustedClose };
         }));
-
+    
         setStocks(updatedStocks);
         setPortfolioStats(calculatePortfolioStats(updatedStocks));
       } catch (err) {
@@ -153,7 +210,6 @@ const Portfolio: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchUserStocks();
   }, []);
 
@@ -178,38 +234,116 @@ const Portfolio: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!selectedStock) return;
-
+    if (!selectedStock) {
+      toast.error('Please select a stock');
+      return;
+    }
+  
+    // Set submitting state immediately
+    setIsSubmitting(true);
+  
+    const details: TransactionDetails = {
+      symbol: selectedStock.symbol,
+      quantity: quantity,
+      price: selectedStock.currentPrice,
+      actionType: actionType
+    };
+  
     try {
+      if (actionType === 'sell') {
+        const response = await fetch('/actions/sellverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            email: session?.user?.email,
+            type: 'transaction',
+            transactionDetails: details
+          })
+        });
+  
+        const data = await response.json();
+        if (response.ok) {
+          setTransactionDetails(details);
+          setIsOTPModalOpen(true);
+        } else {
+          toast.error(data.error || 'Failed to send OTP');
+          // Ensure submitting state is reset on error
+          setIsSubmitting(false);
+        }
+      } else {
+        // For buy action, proceed directly
+        await processSellOrBuy(details);
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+      // Ensure submitting state is reset on error
+      setIsSubmitting(false);
+    }
+  };
+  
+  const verifyOTP = async (otp: string): Promise<boolean> => {
+    if (!transactionDetails) return false;
+  
+    try {
+      const response = await fetch('/actions/verifyotp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: session?.user?.email, 
+          otp,
+          type: 'transaction',
+          transactionDetails 
+        })
+      });
+  
+      const data = await response.json();
+      if (response.ok && data.verified) {
+        // If OTP is verified, proceed with the transaction
+        await processSellOrBuy(transactionDetails);
+        return true;
+      }
+      
+      // Reset submitting state if OTP verification fails
+      setIsSubmitting(false);
+      return false;
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      // Reset submitting state on error
+      setIsSubmitting(false);
+      return false;
+    }
+  };
+  
+  const processSellOrBuy = async (details: TransactionDetails) => {
+    try {
+      // Ensure submitting state is set
       setIsSubmitting(true);
+  
       const response = await fetch('/actions/investment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          symbol: selectedStock.symbol,
-          quantity: quantity,
-          price: selectedStock.currentPrice,
-          actionType: actionType,
-        }),
+        body: JSON.stringify(details),
       });
-
+  
       const data = await response.json();
-
+  
       if (!response.ok) {
         toast.error(data.error || 'Transaction failed');
       } else {
         toast.success(data.message);
-        setSelectedStock(null); // Close the drawer
-        setQuantity(1); // Reset quantity
+        setSelectedStock(null);
+        setQuantity(1);
         window.location.reload();
       }
     } catch (error) {
       console.error('Transaction error:', error);
       toast.error('An unexpected error occurred');
     } finally {
+      // Always reset submitting state
       setIsSubmitting(false);
+      setIsOTPModalOpen(false);
     }
   };
 
@@ -296,6 +430,12 @@ const Portfolio: React.FC = () => {
           }} />
         </TabsContent>
       </Tabs>
+      <OTPVerificationModal
+  isOpen={isOTPModalOpen}
+  onClose={() => setIsOTPModalOpen(false)}
+  onVerify={verifyOTP}
+  email={session?.user?.email || ''}
+/>
 
       {/* Stock Drawer */}
       <Sheet open={!!selectedStock} onOpenChange={() => setSelectedStock(null)}>
@@ -329,12 +469,36 @@ const Portfolio: React.FC = () => {
               </Button>
             </div>
             <Button
-              onClick={handleSubmit}
-              className={`w-full mt-4 ${actionType === "buy" ? "bg-green-500" : "bg-red-500"} text-white`}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Processing..." : actionType === "buy" ? "Buy" : "Sell"}
-            </Button>
+  onClick={handleSubmit}
+  className={`w-full mt-4 ${actionType === "buy" ? "bg-green-500" : "bg-red-500"} text-white`}
+  disabled={isSubmitting}
+>
+  {isSubmitting ? (
+    <div className="flex items-center justify-center">
+      <svg 
+        className="animate-spin h-5 w-5 mr-3" 
+        viewBox="0 0 24 24"
+      >
+        <circle 
+          className="opacity-25" 
+          cx="12" 
+          cy="12" 
+          r="10" 
+          stroke="currentColor" 
+          strokeWidth="4"
+        ></circle>
+        <path 
+          className="opacity-75" 
+          fill="currentColor" 
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        ></path>
+      </svg>
+      Processing...
+    </div>
+  ) : (
+    actionType === "buy" ? "Buy" : "Sell"
+  )}
+</Button>
           </div>
         </SheetContent>
       </Sheet>

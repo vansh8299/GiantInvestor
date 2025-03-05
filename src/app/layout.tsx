@@ -33,7 +33,7 @@ export default function RootLayout({
         <Providers>
           <SearchProvider>
             {!isAuthPage && <Header />}
-            <main className="min-h-screen">{children}</main>
+            <main className="min-h-screen mb-24">{children}</main>
             {!isAuthPage && <Footer />}
           </SearchProvider>
         </Providers>

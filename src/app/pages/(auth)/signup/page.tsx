@@ -79,7 +79,7 @@ const SignUp = () => {
       setError(null);
 
       // Redirect to VerifyOtp page with email as query parameter
-      router.push(`/pages/verifyotp?email=${encodeURIComponent(formData.email)}`);
+      router.push(`/pages/verifyotp?email=${encodeURIComponent(formData.email)}&mode=registration`);
     } catch (error) {
       setSuccess(null);
       setError('An error occurred during signup. Please try again.');

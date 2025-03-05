@@ -19,6 +19,7 @@ const VerifyOtp = () => {
   const [remainingTime, setRemainingTime] = useState(600); // 10 minutes in seconds
   const router = useRouter();
   const mode = searchParams.get('mode');
+  
 
   useEffect(() => {
     const emailParam = searchParams.get('email');

@@ -24,13 +24,33 @@ model User {
   createdAt               DateTime     @default(now())
   updatedAt               DateTime     @updatedAt
   image                   String?
+  transactionOtpVerified  Boolean      @default(false)
   accounts                Account[]
   sessions                Session[]
   transactions            Transaction[]
   stocks                  Stock[]
+  chatMessages            ChatMessage[]
+}
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  text      String
+  sender    String   // 'user' or 'bot'
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
-
+model OtpVerification {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  type      String   // 'registration', 'reset', 'transaction'
+  metadata  Json?    // Store additional context like transaction details
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
 model Stock {
   id              String    @id @default(cuid())
   userId          String

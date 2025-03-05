@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -16,7 +17,16 @@ import {
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast, Toaster } from "sonner"; // Import Sonner
+import { toast, Toaster } from "sonner";
+import { useSession } from "next-auth/react";
+import { OTPVerificationModal } from "@/components/OTPVerificationModal";
+
+interface TransactionDetails {
+  symbol: string;
+  quantity: number;
+  price: number;
+  actionType: 'buy' | 'sell';
+}
 
 interface OptionsData {
   contractID: string;
@@ -30,7 +40,16 @@ interface OptionsData {
   implied_volatility: string;
 }
 
+interface Stock {
+  id: string;
+  symbol: string;
+  quantity: number;
+  purchasePrice: number;
+  currentPrice: number;
+}
+
 const StockDetailPage = () => {
+  const { data: session } = useSession();
   const { symbol } = useParams();
   const [intradayData, setIntradayData] = useState<{ time: string; price: number }[]>([]);
   const [dailyData, setDailyData] = useState<{ date: string; price: number; adjustedClose: number; dividendAmount?: string; volume?: string; splitCoefficient?: string }[]>([]);
@@ -48,8 +67,10 @@ const StockDetailPage = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [actionType, setActionType] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState(1);
+   const [isOTPModalOpen, setIsOTPModalOpen] = useState(false);
+    const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
@@ -150,7 +171,15 @@ const StockDetailPage = () => {
 
     fetchAllData();
   }, [symbol]);
+  const createStockObject = (): Stock => ({
+    id: symbol as string,
+    symbol: symbol as string,
+    quantity: 0, // This will be set by user
+    purchasePrice: dailyData.length > 0 ? dailyData[0].adjustedClose : 0,
+    currentPrice: dailyData.length > 0 ? dailyData[0].adjustedClose : 0
+  });
 
+ 
   const getFilteredOptionsData = () => {
     return optionsData.filter(option => option.expiration === selectedExpiration);
   };
@@ -167,51 +196,129 @@ const StockDetailPage = () => {
   };
 
   const handleBuySellClick = (type: "buy" | "sell") => {
+    // Create a stock object when buy/sell is clicked
+    const stock = createStockObject();
+    setSelectedStock(stock);
     setActionType(type);
     setIsDrawerOpen(true);
   };
-
   const handleQuantityChange = (delta: number) => {
     setQuantity(prev => Math.max(1, prev + delta));
   };
 
   const handleSubmit = async () => {
+    if (!selectedStock) {
+      toast.error('Please select a stock');
+      return;
+    }
+  
+    // Set submitting state immediately
+    setIsSubmitting(true);
+  
+    const details: TransactionDetails = {
+      symbol: selectedStock.symbol,
+      quantity: quantity,
+      price: selectedStock.currentPrice,
+      actionType: actionType
+    };
+  
     try {
-      setIsSubmitting(true);
+      if (actionType === 'sell') {
+        const response = await fetch('/actions/sellverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            email: session?.user?.email,
+            type: 'transaction',
+            transactionDetails: details
+          })
+        });
+  
+        const data = await response.json();
+        if (response.ok) {
+          setTransactionDetails(details);
+          setIsOTPModalOpen(true);
+        } else {
+          toast.error(data.error || 'Failed to send OTP');
+          // Ensure submitting state is reset on error
+          setIsSubmitting(false);
+        }
+      } else {
+        // For buy action, proceed directly
+        await processSellOrBuy(details);
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+      // Ensure submitting state is reset on error
+      setIsSubmitting(false);
+    }
+  };
+  
+  const verifyOTP = async (otp: string): Promise<boolean> => {
+    if (!transactionDetails) return false;
+  
+    try {
+      const response = await fetch('/actions/verifyotp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: session?.user?.email, 
+          otp,
+          type: 'transaction',
+          transactionDetails 
+        })
+      });
+  
+      const data = await response.json();
+      if (response.ok && data.verified) {
+        // If OTP is verified, proceed with the transaction
+        await processSellOrBuy(transactionDetails);
+        return true;
+      }
       
+      // Reset submitting state if OTP verification fails
+      setIsSubmitting(false);
+      return false;
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      // Reset submitting state on error
+      setIsSubmitting(false);
+      return false;
+    }
+  };
+  
+  const processSellOrBuy = async (details: TransactionDetails) => {
+    try {
+      // Ensure submitting state is set
+      setIsSubmitting(true);
+  
       const response = await fetch('/actions/investment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          symbol: symbol,
-          quantity: quantity,
-          price: latestAdjustedClose,
-          actionType: actionType,
-        }),
+        body: JSON.stringify(details),
       });
   
       const data = await response.json();
-      
+  
       if (!response.ok) {
-        // Show error toast
         toast.error(data.error || 'Transaction failed');
       } else {
-        // Show success toast
         toast.success(data.message);
-        setIsDrawerOpen(false);
+        setSelectedStock(null);
         setQuantity(1);
+        window.location.reload();
       }
     } catch (error) {
       console.error('Transaction error:', error);
-      // Show error toast
       toast.error('An unexpected error occurred');
     } finally {
+      // Always reset submitting state
       setIsSubmitting(false);
+      setIsOTPModalOpen(false);
     }
   };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -311,16 +418,47 @@ const StockDetailPage = () => {
                   +
                 </Button>
               </div>
-              <Button 
-  onClick={handleSubmit} 
+              <Button
+  onClick={handleSubmit}
   className={`w-full mt-4 ${actionType === "buy" ? "bg-green-500" : "bg-red-500"} text-white`}
+  disabled={isSubmitting}
 >
-{isSubmitting ? "Processing..." : actionType === "buy" ? "Buy" : "Sell"}
+  {isSubmitting ? (
+    <div className="flex items-center justify-center">
+      <svg 
+        className="animate-spin h-5 w-5 mr-3" 
+        viewBox="0 0 24 24"
+      >
+        <circle 
+          className="opacity-25" 
+          cx="12" 
+          cy="12" 
+          r="10" 
+          stroke="currentColor" 
+          strokeWidth="4"
+        ></circle>
+        <path 
+          className="opacity-75" 
+          fill="currentColor" 
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        ></path>
+      </svg>
+      Processing...
+    </div>
+  ) : (
+    actionType === "buy" ? "Buy" : "Sell"
+  )}
 </Button>
 
             </div>
           </SheetContent>
         </Sheet>
+           <OTPVerificationModal
+          isOpen={isOTPModalOpen}
+          onClose={() => setIsOTPModalOpen(false)}
+          onVerify={verifyOTP}
+          email={session?.user?.email || ''}
+        />
         <Tabs defaultValue="intraday" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="intraday">Intraday</TabsTrigger>

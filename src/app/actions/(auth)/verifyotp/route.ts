@@ -1,18 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { getToken } from "next-auth/jwt";
 
 const prisma = new PrismaClient();
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, otp, mode } = await req.json();
+    const { email, otp, type = 'registration', transactionDetails } = await req.json();
 
     // Validate required fields
-    if (!email || !otp) {
+    if (!email) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
+    }
+
+    // Skip token check for 'registration' and 'reset' types
+    if (type !== 'registration' && type !== 'reset') {
+      const token = await getToken({ 
+        req: req,
+        secret: process.env.NEXTAUTH_SECRET
+      });
+
+      // If no token found, return unauthorized
+      if (!token || !token.email) {
+        return NextResponse.json(
+          { error: "You must be logged in to perform this action" },
+          { status: 401 }
+        );
+      }
+
+      // Ensure email matches token
+      if (email !== token.email) {
+        return NextResponse.json(
+          { error: 'Invalid email' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Skip OTP record check for 'registration' and 'reset' types
+    let otpRecord = null;
+    if (type !== 'registration' && type !== 'reset') {
+      // Find OTP record
+      otpRecord = await prisma.otpVerification.findFirst({
+        where: {
+          email,
+          otp,
+          type,
+          expiresAt: { gt: new Date() }
+        }
+      });
+
+      // Validate OTP
+      if (!otpRecord) {
+        return NextResponse.json(
+          { error: 'Invalid or expired OTP' },
+          { status: 400 }
+        );
+      }
     }
 
     // Find user
@@ -27,68 +74,104 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate OTP
-    if (!user.otp || user.otp !== otp) {
-      return NextResponse.json(
-        { error: 'Invalid OTP' },
-        { status: 400 }
-      );
-    }
+    // Handle different verification types
+    switch (type) {
+      case 'reset':
+        // Verify password reset
+        if (!user.passwordResetRequested) {
+          return NextResponse.json(
+            { error: 'No password reset requested' },
+            { status: 400 }
+          );
+        }
 
-    // Check OTP expiration
-    if (!user.otpExpiry || new Date() > user.otpExpiry) {
-      return NextResponse.json(
-        { error: 'OTP has expired' },
-        { status: 400 }
-      );
-    }
+        // Update user for password reset
+        await prisma.user.update({
+          where: { email },
+          data: {
+            isVerified: true,
+            passwordResetVerified: true,
+            passwordResetRequested: false,
+          },
+        });
+        break;
 
-    // Handle password reset mode
-    if (mode === 'reset') {
-      if (!user.passwordResetRequested) {
+      case 'registration':
+        // Verify email registration
+        await prisma.user.update({
+          where: { email },
+          data: {
+            isVerified: true,
+            emailVerified: new Date(),
+          },
+        });
+        break;
+
+      case 'transaction':
+        // Validate transaction details
+        if (!transactionDetails) {
+          return NextResponse.json(
+            { error: 'Transaction details required' },
+            { status: 400 }
+          );
+        }
+
+        // Validate transaction metadata
+        const metadata = otpRecord?.metadata 
+          ? JSON.parse(otpRecord.metadata as string)
+          : null;
+
+        if (!metadata) {
+          return NextResponse.json(
+            { error: 'Invalid transaction context' },
+            { status: 400 }
+          );
+        }
+
+        // Compare transaction details with stored metadata
+        const isValidTransaction = Object.keys(transactionDetails).every(
+          key => metadata[key] === transactionDetails[key]
+        );
+
+        if (!isValidTransaction) {
+          return NextResponse.json(
+            { error: 'Transaction details do not match' },
+            { status: 400 }
+          );
+        }
+
+        // Mark user as transaction OTP verified
+        await prisma.user.update({
+          where: { email },
+          data: { 
+            transactionOtpVerified: true 
+          },
+        });
+        break;
+
+      default:
         return NextResponse.json(
-          { error: 'No password reset requested' },
+          { error: 'Invalid verification type' },
           { status: 400 }
         );
-      }
-
-      // Update user for password reset verification
-      await prisma.user.update({
-        where: { email },
-        data: {
-          isVerified: true,
-          passwordResetVerified: true,
-          otp: null,
-          otpExpiry: null,
-        },
-      });
-
-      return NextResponse.json(
-        {
-          message: 'Password reset verification successful',
-          verified: true,
-          mode: 'reset'
-        },
-        { status: 200 }
-      );
     }
 
-    // Handle registration verification (default mode)
-    await prisma.user.update({
-      where: { email },
-      data: {
-        isVerified: true,
-        emailVerified: new Date(),
-        otp: null,
-        otpExpiry: null,
-      },
-    });
+    // Delete the used OTP record if it exists
+    if (otpRecord) {
+      await prisma.otpVerification.delete({
+        where: { id: otpRecord.id }
+      });
+    }
 
     return NextResponse.json(
       {
-        message: 'Email verified successfully',
+        message: type === 'reset' 
+          ? 'Password reset verification successful' 
+          : type === 'transaction'
+            ? 'Transaction OTP verified successfully'
+            : 'Verification successful',
         verified: true,
-        mode: 'registration'
+        type: type
       },
       { status: 200 }
     );
