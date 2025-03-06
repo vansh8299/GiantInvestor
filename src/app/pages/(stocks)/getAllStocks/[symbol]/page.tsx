@@ -53,7 +53,7 @@ const StockDetailPage = () => {
   const { symbol } = useParams();
   const [intradayData, setIntradayData] = useState<{ time: string; price: number }[]>([]);
   const [dailyData, setDailyData] = useState<{ date: string; price: number; adjustedClose: number; dividendAmount?: string; volume?: string; splitCoefficient?: string }[]>([]);
-  const [weeklyData, setWeeklyData] = useState<{ date: string; price: number; volume: string; dividend: string }[]>([]);
+  const [weeklyData, setWeeklyData] = useState<{ date: string; price: number;adjustedClose: number; volume: string; dividend: string }[]>([]);
   const [monthlyData, setMonthlyData] = useState<{ date: string; price: number; volume: string; dividend: string }[]>([]);
   const [optionsData, setOptionsData] = useState<OptionsData[]>([]);
   const [expirationDates, setExpirationDates] = useState<string[]>([]);
