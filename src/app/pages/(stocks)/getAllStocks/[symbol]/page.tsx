@@ -67,11 +67,47 @@ const StockDetailPage = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [actionType, setActionType] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState(1);
-   const [isOTPModalOpen, setIsOTPModalOpen] = useState(false);
-    const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
+  const [isOTPModalOpen, setIsOTPModalOpen] = useState(false);
+  const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+  const [userEmail, setUserEmail] = useState<string>('');
   const ITEMS_PER_PAGE = 10;
+
+  const getEmail = async () => {
+    if (session?.user?.email) {
+      return session.user.email;
+    } else {
+      try {
+        const response = await fetch('/actions/decodeEmail', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+  
+        if (response.ok) {
+          const data = await response.json();
+          return data.email;
+        }
+        return null;
+      } catch (e) {
+        console.error("Error getting user email:", e);
+        return null;
+      }
+    }
+  };
+
+  useEffect(() => {
+    const fetchEmail = async () => {
+      const email = await getEmail();
+      if (email) {
+        setUserEmail(email);
+      }
+    };
+
+    fetchEmail();
+  }, [session]);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -162,7 +198,6 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
         setVolume(latestDailyEntry.volume || "0");
         setSplit(latestDailyEntry.splitCoefficient || "1.0");
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         setError("Error fetching data");
       } finally {
@@ -172,6 +207,7 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
 
     fetchAllData();
   }, [symbol]);
+
   const createStockObject = (): Stock => ({
     id: symbol as string,
     symbol: symbol as string,
@@ -180,7 +216,6 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     currentPrice: latestAdjustedClose
   });
 
- 
   const getFilteredOptionsData = () => {
     return optionsData.filter(option => option.expiration === selectedExpiration);
   };
@@ -197,12 +232,12 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   };
 
   const handleBuySellClick = (type: "buy" | "sell") => {
-    // Create a stock object when buy/sell is clicked
     const stock = createStockObject();
     setSelectedStock(stock);
     setActionType(type);
     setIsDrawerOpen(true);
   };
+
   const handleQuantityChange = (delta: number) => {
     setQuantity(prev => Math.max(1, prev + delta));
   };
@@ -213,7 +248,6 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
       return;
     }
   
-    // Set submitting state immediately
     setIsSubmitting(true);
   
     const details: TransactionDetails = {
@@ -229,7 +263,7 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            email: session?.user?.email,
+            email: userEmail,
             type: 'transaction',
             transactionDetails: details
           })
@@ -241,16 +275,13 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
           setIsOTPModalOpen(true);
         } else {
           toast.error(data.error || 'Failed to send OTP');
-          // Ensure submitting state is reset on error
           setIsSubmitting(false);
         }
       } else {
-        // For buy action, proceed directly
         await processSellOrBuy(details);
       }
     } catch (error) {
       toast.error('An unexpected error occurred');
-      // Ensure submitting state is reset on error
       setIsSubmitting(false);
     }
   };
@@ -263,7 +294,7 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: session?.user?.email, 
+          email: userEmail, 
           otp,
           type: 'transaction',
           transactionDetails 
@@ -272,17 +303,14 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   
       const data = await response.json();
       if (response.ok && data.verified) {
-        // If OTP is verified, proceed with the transaction
         await processSellOrBuy(transactionDetails);
         return true;
       }
       
-      // Reset submitting state if OTP verification fails
       setIsSubmitting(false);
       return false;
     } catch (error) {
       console.error('OTP verification error:', error);
-      // Reset submitting state on error
       setIsSubmitting(false);
       return false;
     }
@@ -290,7 +318,6 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   
   const processSellOrBuy = async (details: TransactionDetails) => {
     try {
-      // Ensure submitting state is set
       setIsSubmitting(true);
   
       const response = await fetch('/actions/investment', {
@@ -315,11 +342,11 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
       console.error('Transaction error:', error);
       toast.error('An unexpected error occurred');
     } finally {
-      // Always reset submitting state
       setIsSubmitting(false);
       setIsOTPModalOpen(false);
     }
   };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -332,7 +359,7 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     return <div>Error: {error}</div>;
   }
 
-  const latestAdjustedClose = dailyData.length > 0 ? dailyData[0].adjustedClose : weeklyData[0].adjustedClose
+  const latestAdjustedClose = dailyData.length > 0 ? dailyData[0].adjustedClose : weeklyData[0].adjustedClose;
 
   return (
     <div className="min-h-screen bg-green-50">
@@ -454,12 +481,16 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
             </div>
           </SheetContent>
         </Sheet>
-           <OTPVerificationModal
-          isOpen={isOTPModalOpen}
-          onClose={() => setIsOTPModalOpen(false)}
-          onVerify={verifyOTP}
-          email={session?.user?.email || ''}
-        />
+            <OTPVerificationModal
+           isOpen={isOTPModalOpen}
+           onClose={() => {
+             setIsOTPModalOpen(false);
+             setIsSubmitting(false);
+           }}
+           onVerify={verifyOTP}
+           email={userEmail}
+           transactionDetails={transactionDetails} // Pass the transactionDetails here
+         />
         <Tabs defaultValue="intraday" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="intraday">Intraday</TabsTrigger>

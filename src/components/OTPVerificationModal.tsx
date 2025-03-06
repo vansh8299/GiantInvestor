@@ -6,19 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-
+interface TransactionDetails {
+  symbol: string;
+  quantity: number;
+  price: number;
+  actionType: 'buy' | 'sell';
+}
 interface OTPVerificationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onVerify: (otp: string) => Promise<boolean>;
   email: string;
+  transactionDetails: TransactionDetails | null; // Add this line
 }
-
 export const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
   isOpen,
   onClose,
   onVerify,
-  email
+  email,
+  transactionDetails
 }) => {
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -50,9 +56,13 @@ export const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
       const response = await fetch('/actions/sellverify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ 
+          email,
+          type: 'transaction',
+          transactionDetails // Provide an initializer for transactionDetails
+        })
       });
-
+  
       const data = await response.json();
       if (response.ok) {
         toast.success('New OTP sent to your email');
@@ -63,7 +73,6 @@ export const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
       toast.error('Failed to resend OTP');
     }
   };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>

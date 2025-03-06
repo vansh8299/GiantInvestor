@@ -189,7 +189,7 @@ const VerifyOtp = () => {
 
             <div className="text-center text-sm">
               <p className="text-gray-600">Time remaining: {formatTime(remainingTime)}</p>
-              {remainingTime === 0 && (
+              (
                 <button
                   onClick={handleResendOtp}
                   disabled={loading}
@@ -197,7 +197,7 @@ const VerifyOtp = () => {
                 >
                   Resend OTP
                 </button>
-              )}
+              )
             </div>
 
             <Button

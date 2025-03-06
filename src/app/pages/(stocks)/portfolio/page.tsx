@@ -476,14 +476,15 @@ const Portfolio: React.FC = () => {
         </TabsContent>
       </Tabs>
       <OTPVerificationModal
-        isOpen={isOTPModalOpen}
-        onClose={() => {
-          setIsOTPModalOpen(false);
-          setIsSubmitting(false);
-        }}
-        onVerify={verifyOTP}
-        email={userEmail} // Pass the resolved email
-      />
+  isOpen={isOTPModalOpen}
+  onClose={() => {
+    setIsOTPModalOpen(false);
+    setIsSubmitting(false);
+  }}
+  onVerify={verifyOTP}
+  email={userEmail}
+  transactionDetails={transactionDetails} // Pass the transactionDetails here
+/>
 
       {/* Stock Drawer */}
       <Sheet open={!!selectedStock} onOpenChange={() => {
