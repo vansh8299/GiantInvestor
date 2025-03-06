@@ -3,21 +3,33 @@ import { generateOTP } from "@/lib/utils/otp";
 import { sendEmail } from "@/lib/utils/sendEmail";
 import { getToken } from "next-auth/jwt";
 import { PrismaClient } from "@prisma/client";
-
+import jwt from 'jsonwebtoken';
 const prisma = new PrismaClient();
 
 export async function POST(req: NextRequest) {
   try {
-    // Get the token from the session
-    const token = await getToken({ 
+    let token;
+
+    // Try to get the token from NextAuth
+    const nextAuthToken = await getToken({ 
       req: req,
       secret: process.env.NEXTAUTH_SECRET
     });
 
-    // If no token found, return unauthorized
+    if (nextAuthToken) {
+      token = nextAuthToken;
+    } else {
+      const customToken = req.cookies.get('token')?.value;
+      if (customToken) {
+        const secret = process.env.JWT_SECRET || 'default_secret';
+        const decoded = jwt.verify(customToken, secret) as { email: string };
+        token = { email: decoded.email };
+      }
+    }
+
     if (!token || !token.email) {
       return NextResponse.json(
-        { error: "You must be logged in to perform this action" },
+        { error: "You must be logged in to send messages" },
         { status: 401 }
       );
     }
@@ -28,7 +40,9 @@ export async function POST(req: NextRequest) {
       transactionDetails 
     } = await req.json();
 
-    // Validate email matches the logged-in user
+    console.log(email)
+    console.log(token.email)
+
     if (email !== token.email) {
       return NextResponse.json(
         { error: "Invalid email" },

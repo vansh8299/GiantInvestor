@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
 import { useSession } from "next-auth/react";
 import { OTPVerificationModal } from "@/components/OTPVerificationModal";
+// Remove the direct import of jsonwebtoken
+// import jwt from 'jsonwebtoken';
 
 interface Stock {
   id: string;
@@ -132,38 +134,55 @@ const Portfolio: React.FC = () => {
   const [isOTPModalOpen, setIsOTPModalOpen] = useState(false);
   const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
   const [dailyData, setDailyData] = useState<{ date: string; price: number; adjustedClose: number; dividendAmount?: string; volume?: string; splitCoefficient?: string }[]>([]);
+  const [userEmail, setUserEmail] = useState<string>(''); // Add this state
   const router = useRouter();
 
+  // Fetch and set the email
   useEffect(() => {
-    // const fetchUserStocks = async () => {
-    //   try {
-    //     setLoading(true);
-    //     const response = await fetch('/actions/getStocks');
+    const fetchEmail = async () => {
+      const email = await getEmail();
+      if (email) {
+        setUserEmail(email);
+      }
+    };
 
-    //     if (!response.ok) {
-    //       throw new Error('Failed to fetch portfolio data');
-    //     }
+    fetchEmail();
+  }, []);
+  const getEmail = async () => {
+    if (session?.user?.email) {
+      return session.user.email;
+    } else {
+      try {
+        const response = await fetch('/actions/decodeEmail', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+  
+        if (response.ok) {
+          const data = await response.json();
+          return data.email;
+        }
+        return null;
+      } catch (e) {
+        console.error("Error getting user email:", e);
+        return null;
+      }
+    }
+  };
 
-    //     const { data } = await response.json();
-    //     const updatedStocks = await Promise.all(data.stocks.map(async (stock: Stock) => {
-    //       const dailyRes = await fetch(`/actions/daily/${stock.symbol}`);
-    //       if (!dailyRes.ok) {
-    //         throw new Error('Failed to fetch daily data');
-    //       }
-    //       const dailyData = await dailyRes.json();
-    //       const timeSeriesDaily = dailyData["Time Series (Daily)"] as Record<string, { "5. adjusted close": string }> | undefined;
-    //       const latestAdjustedClose = timeSeriesDaily ? parseFloat(Object.values(timeSeriesDaily)[0]["5. adjusted close"]) : stock.currentPrice;
-    //       return { ...stock, currentPrice: latestAdjustedClose };
-    //     }));
+ 
+  useEffect(() => {
+    const fetchUserEmail = async () => {
+      if (!session?.user?.email) {
+        const email = await getEmail();
 
-    //     setStocks(updatedStocks);
-    //     setPortfolioStats(calculatePortfolioStats(updatedStocks));
-    //   } catch (err) {
-    //     setError(err instanceof Error ? err.message : 'An unknown error occurred');
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // };
+      }
+    };
+    
+    fetchUserEmail();
+    
     const fetchUserStocks = async () => {
       try {
         setLoading(true);
@@ -177,25 +196,31 @@ const Portfolio: React.FC = () => {
         const updatedStocks = await Promise.all(data.stocks.map(async (stock: Stock) => {
           let latestAdjustedClose = stock.currentPrice;
     
-          // Try fetching daily data first
-          const dailyRes = await fetch(`/actions/daily/${stock.symbol}`);
-          if (dailyRes.ok) {
-            const dailyData = await dailyRes.json();
-            const timeSeriesDaily = dailyData["Time Series (Daily)"] as Record<string, { "5. adjusted close": string }> | undefined;
-            if (timeSeriesDaily) {
-              latestAdjustedClose = parseFloat(Object.values(timeSeriesDaily)[0]["5. adjusted close"]);
+          try {
+            const dailyRes = await fetch(`/actions/daily/${stock.symbol}`);
+            if (dailyRes.ok) {
+              const dailyData = await dailyRes.json();
+              const timeSeriesDaily = dailyData["Time Series (Daily)"] as Record<string, { "5. adjusted close": string }> | undefined;
+              if (timeSeriesDaily && Object.values(timeSeriesDaily).length > 0) {
+                latestAdjustedClose = parseFloat(Object.values(timeSeriesDaily)[0]["5. adjusted close"]);
+              }
             }
+          } catch (e) {
+            console.error(`Error fetching daily data for ${stock.symbol}:`, e);
           }
     
-          // If daily data is not available, try fetching weekly data
           if (latestAdjustedClose === stock.currentPrice) {
-            const weeklyRes = await fetch(`/actions/weekly/${stock.symbol}`);
-            if (weeklyRes.ok) {
-              const weeklyData = await weeklyRes.json();
-              const timeSeriesWeekly = weeklyData["Weekly Adjusted Time Series"] as Record<string, { "5. adjusted close": string }> | undefined;
-              if (timeSeriesWeekly) {
-                latestAdjustedClose = parseFloat(Object.values(timeSeriesWeekly)[0]["5. adjusted close"]);
+            try {
+              const weeklyRes = await fetch(`/actions/weekly/${stock.symbol}`);
+              if (weeklyRes.ok) {
+                const weeklyData = await weeklyRes.json();
+                const timeSeriesWeekly = weeklyData["Weekly Adjusted Time Series"] as Record<string, { "5. adjusted close": string }> | undefined;
+                if (timeSeriesWeekly && Object.values(timeSeriesWeekly).length > 0) {
+                  latestAdjustedClose = parseFloat(Object.values(timeSeriesWeekly)[0]["5. adjusted close"]);
+                }
               }
+            } catch (e) {
+              console.error(`Error fetching weekly data for ${stock.symbol}:`, e);
             }
           }
     
@@ -205,19 +230,31 @@ const Portfolio: React.FC = () => {
         setStocks(updatedStocks);
         setPortfolioStats(calculatePortfolioStats(updatedStocks));
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        console.error("Error in fetchUserStocks:", err);
+        setError(typeof err === 'object' && err !== null && 'message' in err ? String(err.message) : 'An unknown error occurred');
       } finally {
         setLoading(false);
       }
     };
+    
     fetchUserStocks();
-  }, []);
+  }, [session]);
 
   const calculatePortfolioStats = (stocks: Stock[]): PortfolioStats => {
+    if (!stocks || stocks.length === 0) {
+      return {
+        totalInvestment: 0,
+        currentValue: 0,
+        profitLoss: 0,
+        profitLossPercentage: 0,
+        stockCount: 0,
+      };
+    }
+    
     const totalInvestment = stocks.reduce((sum, stock) => sum + stock.quantity * stock.purchasePrice, 0);
     const currentValue = stocks.reduce((sum, stock) => sum + stock.quantity * stock.currentPrice, 0);
     const profitLoss = currentValue - totalInvestment;
-    const profitLossPercentage = (profitLoss / totalInvestment) * 100;
+    const profitLossPercentage = totalInvestment > 0 ? (profitLoss / totalInvestment) * 100 : 0;
     const stockCount = stocks.length;
 
     return {
@@ -239,7 +276,6 @@ const Portfolio: React.FC = () => {
       return;
     }
   
-    // Set submitting state immediately
     setIsSubmitting(true);
   
     const details: TransactionDetails = {
@@ -251,11 +287,19 @@ const Portfolio: React.FC = () => {
   
     try {
       if (actionType === 'sell') {
+        const email = await getEmail();
+  
+        if (!email) {
+          toast.error('User email not found. Please log in again.');
+          setIsSubmitting(false);
+          return;
+        }
+  
         const response = await fetch('/actions/sellverify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            email: session?.user?.email,
+            email: email,
             type: 'transaction',
             transactionDetails: details
           })
@@ -267,16 +311,14 @@ const Portfolio: React.FC = () => {
           setIsOTPModalOpen(true);
         } else {
           toast.error(data.error || 'Failed to send OTP');
-          // Ensure submitting state is reset on error
           setIsSubmitting(false);
         }
       } else {
-        // For buy action, proceed directly
         await processSellOrBuy(details);
       }
     } catch (error) {
+      console.error("Submit error:", error);
       toast.error('An unexpected error occurred');
-      // Ensure submitting state is reset on error
       setIsSubmitting(false);
     }
   };
@@ -285,11 +327,19 @@ const Portfolio: React.FC = () => {
     if (!transactionDetails) return false;
   
     try {
+      const email = await getEmail();
+  
+      if (!email) {
+        toast.error('User email not found. Please log in again.');
+        setIsSubmitting(false);
+        return false;
+      }
+  
       const response = await fetch('/actions/verifyotp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: session?.user?.email, 
+          email: email, 
           otp,
           type: 'transaction',
           transactionDetails 
@@ -298,17 +348,14 @@ const Portfolio: React.FC = () => {
   
       const data = await response.json();
       if (response.ok && data.verified) {
-        // If OTP is verified, proceed with the transaction
         await processSellOrBuy(transactionDetails);
         return true;
       }
-      
-      // Reset submitting state if OTP verification fails
+  
       setIsSubmitting(false);
       return false;
     } catch (error) {
       console.error('OTP verification error:', error);
-      // Reset submitting state on error
       setIsSubmitting(false);
       return false;
     }
@@ -316,7 +363,6 @@ const Portfolio: React.FC = () => {
   
   const processSellOrBuy = async (details: TransactionDetails) => {
     try {
-      // Ensure submitting state is set
       setIsSubmitting(true);
   
       const response = await fetch('/actions/investment', {
@@ -341,7 +387,6 @@ const Portfolio: React.FC = () => {
       console.error('Transaction error:', error);
       toast.error('An unexpected error occurred');
     } finally {
-      // Always reset submitting state
       setIsSubmitting(false);
       setIsOTPModalOpen(false);
     }
@@ -431,14 +476,20 @@ const Portfolio: React.FC = () => {
         </TabsContent>
       </Tabs>
       <OTPVerificationModal
-  isOpen={isOTPModalOpen}
-  onClose={() => setIsOTPModalOpen(false)}
-  onVerify={verifyOTP}
-  email={session?.user?.email || ''}
-/>
+        isOpen={isOTPModalOpen}
+        onClose={() => {
+          setIsOTPModalOpen(false);
+          setIsSubmitting(false);
+        }}
+        onVerify={verifyOTP}
+        email={userEmail} // Pass the resolved email
+      />
 
       {/* Stock Drawer */}
-      <Sheet open={!!selectedStock} onOpenChange={() => setSelectedStock(null)}>
+      <Sheet open={!!selectedStock} onOpenChange={() => {
+        setSelectedStock(null);
+        setIsSubmitting(false);
+      }}>
         <SheetContent side="bottom" className="h-[40vh]">
           <SheetHeader>
             <div className="flex items-center">
@@ -469,36 +520,36 @@ const Portfolio: React.FC = () => {
               </Button>
             </div>
             <Button
-  onClick={handleSubmit}
-  className={`w-full mt-4 ${actionType === "buy" ? "bg-green-500" : "bg-red-500"} text-white`}
-  disabled={isSubmitting}
->
-  {isSubmitting ? (
-    <div className="flex items-center justify-center">
-      <svg 
-        className="animate-spin h-5 w-5 mr-3" 
-        viewBox="0 0 24 24"
-      >
-        <circle 
-          className="opacity-25" 
-          cx="12" 
-          cy="12" 
-          r="10" 
-          stroke="currentColor" 
-          strokeWidth="4"
-        ></circle>
-        <path 
-          className="opacity-75" 
-          fill="currentColor" 
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-        ></path>
-      </svg>
-      Processing...
-    </div>
-  ) : (
-    actionType === "buy" ? "Buy" : "Sell"
-  )}
-</Button>
+              onClick={handleSubmit}
+              className={`w-full mt-4 ${actionType === "buy" ? "bg-green-500" : "bg-red-500"} text-white`}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <div className="flex items-center justify-center">
+                  <svg 
+                    className="animate-spin h-5 w-5 mr-3" 
+                    viewBox="0 0 24 24"
+                  >
+                    <circle 
+                      className="opacity-25" 
+                      cx="12" 
+                      cy="12" 
+                      r="10" 
+                      stroke="currentColor" 
+                      strokeWidth="4"
+                    ></circle>
+                    <path 
+                      className="opacity-75" 
+                      fill="currentColor" 
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Processing...
+                </div>
+              ) : (
+                actionType === "buy" ? "Buy" : "Sell"
+              )}
+            </Button>
           </div>
         </SheetContent>
       </Sheet>

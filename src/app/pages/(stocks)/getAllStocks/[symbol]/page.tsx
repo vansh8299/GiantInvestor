@@ -117,6 +117,7 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
         const formattedWeeklyData = weeklyData["Weekly Adjusted Time Series"] ? Object.entries(weeklyData["Weekly Adjusted Time Series"]).map(([date, values]) => ({
           date,
           price: parseFloat((values as { "4. close": string })["4. close"]),
+          adjustedClose: parseFloat((values as { "5. adjusted close": string })["5. adjusted close"] || "0"),
           volume: (values as { "6. volume": string })["6. volume"] || "0",
           dividend: (values as { "7. dividend amount": string })["7. dividend amount"] || "0.0000",
         })) : [];
@@ -175,8 +176,8 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     id: symbol as string,
     symbol: symbol as string,
     quantity: 0, // This will be set by user
-    purchasePrice: dailyData.length > 0 ? dailyData[0].adjustedClose : 0,
-    currentPrice: dailyData.length > 0 ? dailyData[0].adjustedClose : 0
+    purchasePrice: latestAdjustedClose,
+    currentPrice: latestAdjustedClose
   });
 
  
@@ -331,7 +332,7 @@ const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     return <div>Error: {error}</div>;
   }
 
-  const latestAdjustedClose = dailyData.length > 0 ? dailyData[0].adjustedClose : "N/A";
+  const latestAdjustedClose = dailyData.length > 0 ? dailyData[0].adjustedClose : weeklyData[0].adjustedClose
 
   return (
     <div className="min-h-screen bg-green-50">

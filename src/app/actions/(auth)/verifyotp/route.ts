@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getToken } from "next-auth/jwt";
-
+import jwt from 'jsonwebtoken';
 const prisma = new PrismaClient();
 
 export async function POST(req: NextRequest) {
@@ -18,19 +18,32 @@ export async function POST(req: NextRequest) {
 
     // Skip token check for 'registration' and 'reset' types
     if (type !== 'registration' && type !== 'reset') {
-      const token = await getToken({ 
-        req: req,
-        secret: process.env.NEXTAUTH_SECRET
-      });
-
-      // If no token found, return unauthorized
-      if (!token || !token.email) {
-        return NextResponse.json(
-          { error: "You must be logged in to perform this action" },
-          { status: 401 }
-        );
-      }
-
+         let token;
+     
+         // Try to get the token from NextAuth
+         const nextAuthToken = await getToken({ 
+           req: req,
+           secret: process.env.NEXTAUTH_SECRET
+         });
+     
+         if (nextAuthToken) {
+           token = nextAuthToken;
+         } else {
+           const customToken = req.cookies.get('token')?.value;
+           if (customToken) {
+             const secret = process.env.JWT_SECRET || 'default_secret';
+             const decoded = jwt.verify(customToken, secret) as { email: string };
+             token = { email: decoded.email };
+           }
+         }
+     
+         // If no token found, return unauthorized
+         if (!token || !token.email) {
+           return NextResponse.json(
+             { error: "You must be logged in to send messages" },
+             { status: 401 }
+           );
+         }
       // Ensure email matches token
       if (email !== token.email) {
         return NextResponse.json(

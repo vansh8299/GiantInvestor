@@ -1,23 +1,40 @@
-// app/api/user/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { getToken } from 'next-auth/jwt';
+import jwt from 'jsonwebtoken';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the token from the session
-    const token = await getToken({ 
+    let token;
+
+    // Try to get the token from NextAuth
+    const nextAuthToken = await getToken({ 
       req: request,
       secret: process.env.NEXTAUTH_SECRET
     });
 
-    // If no token found, return unauthorized
-    
+    if (nextAuthToken) {
+      token = nextAuthToken;
+    } else {
+      // If NextAuth token is not found, try to get the custom JWT token from cookies
+      const customToken = request.cookies.get('token')?.value;
+      if (customToken) {
+        const secret = process.env.JWT_SECRET || 'default_secret';
+        const decoded = jwt.verify(customToken, secret) as { email: string };
+        token = { email: decoded.email };
+      }
+    }
 
-    // Find the user by id
+    if (!token?.email) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const user = await db.user.findUnique({
       where: {
-        email: token?.email as string
+        email: token.email
       },
       select: {
         id: true,
