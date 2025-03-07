@@ -91,7 +91,7 @@ const VerifyOtp = () => {
   const handleResendOtp = async () => {
     try {
       setLoading(true);
-      const endpoint = mode === 'reset' ? '/actions/forgetpassword' : '/actions/resetpassword';
+      const endpoint = mode === 'reset' ? '/actions/forgetpassword' : '/api/resendotpsignup';
       await axios.post(endpoint, { email });
       setRemainingTime(600); // Reset timer to 10 minutes
       toast.success('New OTP sent successfully');
