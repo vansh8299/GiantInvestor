@@ -218,7 +218,7 @@ const Header = () => {
     
     try {
       // Call our API endpoint
-      const response = await fetch('/api/send-notification', {
+      const response = await fetch('/api/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
