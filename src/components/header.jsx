@@ -5,8 +5,7 @@ import { Bell, Send } from "lucide-react";
 import cookies from 'js-cookie';
 import { useEffect, useState } from "react";
 import SearchDropdown from "./SearchDropdown";
-import { initializeApp } from "firebase/app";
-import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging";
+import { createClient } from '@supabase/supabase-js';
 
 const Header = () => {
   const [token, setToken] = useState(null);
@@ -14,19 +13,10 @@ const Header = () => {
   const [session, setSession] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [fcmToken, setFcmToken] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [fcmSupported, setFcmSupported] = useState(true);
-  
-  // Firebase configuration - replace with your actual config
-  const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-  };
+  const [supabaseClient, setSupabaseClient] = useState(null);
+  const [userId, setUserId] = useState(null)
+  const [subscriptionStatus, setSubscriptionStatus] = useState(false);
   
   useEffect(() => {
     const checkAuth = async () => {
@@ -45,118 +35,90 @@ const Header = () => {
 
     checkAuth();
     
-    // Initialize Firebase only in browser environment
+    // Initialize Supabase only in browser environment
     if (typeof window !== 'undefined') {
-      initializeFirebaseMessaging();
+      initializeSupabase();
     }
   }, []);
-  
-  const initializeFirebaseMessaging = async () => {
+  const fetchUserData = async () => {
     try {
-      // First check if FCM is supported in this browser
-      const isFCMSupported = await isSupported();
-      if (!isFCMSupported) {
-        console.log('Firebase Cloud Messaging is not supported in this browser');
-        setFcmSupported(false);
+      const response = await fetch('/actions/getuser');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.user && data.user.id) {
+          setUserId(data.user.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+  const initializeSupabase = async () => {
+    try {
+      // Initialize Supabase client
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseKey) {
+        console.error('Supabase environment variables not set');
         return;
       }
       
-      // Check if service worker is registered
-      if (!('serviceWorker' in navigator)) {
-        console.log('Service workers are not supported in this browser');
-        setFcmSupported(false);
-        return;
-      }
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      setSupabaseClient(supabase);
       
-      // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      const messaging = getMessaging(app);
-      
-      // Check if the service worker exists and is registered
-      try {
-        navigator.serviceWorker.ready.then((registration) => {
-          console.log('Service worker is ready:', registration);
-        });
-      } catch (error) {
-        console.error('Service worker registration error:', error);
-      }
-      
-      // Register service worker if not already registered
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        let swRegistered = false;
-        for (const registration of registrations) {
-          if (registration.scope.includes(window.location.origin)) {
-            swRegistered = true;
-            break;
-          }
-        }
-        
-        if (!swRegistered) {
-          navigator.serviceWorker.register('/firebase-messaging-sw.js')
-            .then(registration => {
-              console.log('Service Worker registered with scope:', registration.scope);
-            })
-            .catch(err => {
-              console.error('Service Worker registration failed:', err);
-            });
-        }
-      });
-      
-      // Request permission and get FCM token
-      try {
+      // Set up push notification permission
+      if ('Notification' in window) {
         const permission = await Notification.requestPermission();
         console.log('Notification permission status:', permission);
         
         if (permission === 'granted') {
           console.log('Notification permission granted.');
           
-          // Get FCM token with explicit service worker registration
-          navigator.serviceWorker.ready.then(async (registration) => {
-            try {
-              console.log('Getting FCM token with service worker:', registration);
-              const currentToken = await getToken(messaging, {
-                vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-                serviceWorkerRegistration: registration
-              });
-              
-              if (currentToken) {
-                console.log('FCM Token obtained:', currentToken);
-                setFcmToken(currentToken);
-                
-                // Here you would typically send this token to your server
-                if (token || googletoken || session) {
-                  // saveTokenToServer(currentToken);
-                }
-              } else {
-                console.log('No FCM token received.');
-              }
-            } catch (tokenError) {
-              console.error('Error getting FCM token:', tokenError);
-            }
-          });
-          
-          // Set up message handler
-          onMessage(messaging, (payload) => {
-            console.log('Message received:', payload);
-            const newNotification = {
-              id: Date.now().toString(),
-              title: payload.notification.title,
-              body: payload.notification.body,
-              timestamp: new Date().toISOString(),
-              read: false,
-              data: payload.data
-            };
-            
-            setNotifications(prev => [newNotification, ...prev]);
-          });
+          // Set up Supabase realtime subscription for notifications
+          setupRealtimeSubscription(supabase);
         } else {
           console.log('Notification permission denied.');
         }
-      } catch (permError) {
-        console.error('Error requesting permission:', permError);
       }
     } catch (error) {
-      console.error('Error initializing Firebase:', error);
+      console.error('Error initializing Supabase:', error);
+    }
+  };
+  
+  const setupRealtimeSubscription = (supabase) => {
+    if (!supabase) return;
+    
+    try {
+      // Get the user ID from token or session
+   
+      
+      // Subscribe to a channel for notifications
+      const channel = supabase
+        .channel(`notifications-${userId || 'general'}`)
+        .on('broadcast', { event: 'notification' }, (payload) => {
+          console.log('Notification received:', payload);
+          const newNotification = {
+            id: Date.now().toString(),
+            title: payload.payload.title,
+            body: payload.payload.message,
+            timestamp: new Date().toISOString(),
+            read: false,
+            data: payload.payload.data || {}
+          };
+          
+          setNotifications(prev => [newNotification, ...prev]);
+        })
+        .subscribe(status => {
+          console.log('Subscription status:', status);
+          setSubscriptionStatus(status === 'SUBSCRIBED');
+        });
+      
+      return () => {
+        channel.unsubscribe();
+      };
+    } catch (error) {
+      console.error('Error setting up realtime subscription:', error);
     }
   };
 
@@ -181,7 +143,7 @@ const Header = () => {
     const newNotification = {
       id: Date.now().toString(),
       title: "Local Test Notification",
-      body: "This is a local test notification since FCM isn't available.",
+      body: "This is a local test notification.",
       timestamp: new Date().toISOString(),
       read: false,
       data: { type: "test" }
@@ -192,31 +154,17 @@ const Header = () => {
   
   // Function to trigger a test notification via the API
   const triggerTestNotification = async () => {
-    if (!fcmSupported) {
+    if (!supabaseClient || !subscriptionStatus) {
       createLocalTestNotification();
-      return;
-    }
-    
-    if (!fcmToken) {
-      console.error('FCM token not available');
-      // Add local notification about missing token
-      setNotifications(prev => [{
-        id: Date.now().toString(),
-        title: "FCM Token Not Available",
-        body: "Please ensure notifications are enabled in your browser and refresh the page.",
-        timestamp: new Date().toISOString(),
-        read: false,
-        data: { type: "error" }
-      }, ...prev]);
-      
-      // Try to re-initialize Firebase
-      initializeFirebaseMessaging();
       return;
     }
     
     setIsLoading(true);
     
     try {
+      // Get userId from session or token
+      
+      
       // Call our API endpoint
       const response = await fetch('/api/send', {
         method: 'POST',
@@ -224,9 +172,9 @@ const Header = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          token: fcmToken,
+          userId: userId,
           title: 'Giant Investor Update',
-          body: 'This is a test notification from Giant Investor.',
+          message: 'This is a test notification from Giant Investor.',
           data: {
             type: 'test',
             url: '/dashboard'
@@ -296,14 +244,14 @@ const Header = () => {
               >
                 <Send size={16} />
                 <span className="text-sm">
-                  {isLoading ? 'Sending...' : fcmSupported ? 'Test Notification' : 'Local Notification'}
+                  {isLoading ? 'Sending...' : subscriptionStatus ? 'Test Notification' : 'Local Notification'}
                 </span>
               </Button>
               
-              {/* FCM Status - for debugging */}
-              {!fcmSupported && (
+              {/* Subscription Status - for debugging */}
+              {!subscriptionStatus && (
                 <div className="text-xs text-red-500">
-                  FCM not supported
+                  Not subscribed
                 </div>
               )}
               

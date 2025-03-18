@@ -1,67 +1,71 @@
 // src/app/api/send/route.js
-import { initializeApp, cert, getApp } from 'firebase-admin/app';
-import { getMessaging } from 'firebase-admin/messaging';
+import { createClient } from '@supabase/supabase-js';
 
-// Initialize Firebase Admin if it hasn't been initialized yet
-let app;
-try {
-  app = getApp();
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-} catch (error) {
-  console.log('Initializing Firebase Admin SDK...');
-
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    console.error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is required');
+// Initialize Supabase client
+const getSupabaseAdmin = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Supabase environment variables not set');
   }
-
-  let serviceAccount;
-  try {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-  } catch (error) {
-    console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:', error);
-    throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT_KEY');
-  }
-
-  app = initializeApp({
-    credential: cert(serviceAccount),
-    projectId: process.env.FIREBASE_PROJECT_ID,
-  });
-}
+  
+  return createClient(supabaseUrl, supabaseServiceKey);
+};
 
 // Named export for POST method
 export async function POST(req) {
   try {
-    const { token, title, body, data = {} } = await req.json();
+    const { userId, title, message, data = {} } = await req.json();
 
-    if (!token) {
-      return new Response(JSON.stringify({ message: 'FCM token is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
+    // Get Supabase admin client
+    const supabase = getSupabaseAdmin();
+    
+    // Channel to broadcast to
+    const channel = userId ? `notifications-${userId}` : 'notifications-general';
+    
+    // Send notification via Supabase Realtime
+    const { error } = await supabase
+      .channel(channel)
+      .send({
+        type: 'broadcast',
+        event: 'notification',
+        payload: {
+          title: title || 'New Notification',
+          message: message || 'You have a new notification',
+          data: {
+            ...data,
+            timestamp: new Date().toISOString(),
+          }
+        }
       });
+
+    if (error) {
+      throw new Error(`Failed to send notification: ${error.message}`);
     }
-
-    // Message payload
-    const message = {
-      notification: {
+    
+    // Optionally, also save the notification to a Supabase table
+    const { error: dbError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userId || null,
         title: title || 'New Notification',
-        body: body || 'You have a new notification',
-      },
-      data: {
-        ...data,
-        timestamp: new Date().toISOString(),
-      },
-      token: token,
-    };
-
-    // Send the message
-    const messaging = getMessaging(app);
-    const response = await messaging.send(message);
+        message: message || 'You have a new notification',
+        data: {
+          ...data,
+          timestamp: new Date().toISOString(),
+        },
+        read: false
+      });
+      
+    if (dbError) {
+      console.error('Error saving notification to database:', dbError);
+      // Continue anyway, as the broadcast probably worked
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        messageId: response,
         message: 'Notification sent successfully',
       }),
       {
