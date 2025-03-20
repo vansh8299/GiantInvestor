@@ -1,38 +1,38 @@
-// app/api/stocks/transaction/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { db } from "@/lib/prisma";
 import jwt from 'jsonwebtoken';
+import { createClient } from "@supabase/supabase-js";
+
 export async function POST(req: NextRequest) {
   try {
     let token;
        
-           // Try to get the token from NextAuth
-           const nextAuthToken = await getToken({ 
-             req: req,
-             secret: process.env.NEXTAUTH_SECRET
-           });
+    // Try to get the token from NextAuth
+    const nextAuthToken = await getToken({ 
+      req: req,
+      secret: process.env.NEXTAUTH_SECRET
+    });
        
-           if (nextAuthToken) {
-             token = nextAuthToken;
-           } else {
-             const customToken = req.cookies.get('token')?.value;
-             if (customToken) {
-               const secret = process.env.JWT_SECRET || 'default_secret';
-               const decoded = jwt.verify(customToken, secret) as { email: string };
-               token = { email: decoded.email };
-             }
-           }
+    if (nextAuthToken) {
+      token = nextAuthToken;
+    } else {
+      const customToken = req.cookies.get('token')?.value;
+      if (customToken) {
+        const secret = process.env.JWT_SECRET || 'default_secret';
+        const decoded = jwt.verify(customToken, secret) as { email: string };
+        token = { email: decoded.email };
+      }
+    }
        
-           // If no token found, return unauthorized
-           if (!token || !token.email) {
-             return NextResponse.json(
-               { error: "You must be logged in to send messages" },
-               { status: 401 }
-             );
-           }
+    // If no token found, return unauthorized
+    if (!token || !token.email) {
+      return NextResponse.json(
+        { error: "You must be logged in to send messages" },
+        { status: 401 }
+      );
+    }
        
-   
     const { symbol, quantity, price, actionType } = await req.json();
 
     // Validate required fields
@@ -57,6 +57,11 @@ export async function POST(req: NextRequest) {
 
     // Calculate total transaction amount
     const totalAmount = price * quantity;
+
+    // Initialize Supabase client for notification
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Handle buy action
     if (actionType === "buy") {
@@ -128,6 +133,42 @@ export async function POST(req: NextRequest) {
           stockResult,
         };
       });
+
+      // Send notification via Supabase
+      await supabase
+        .channel(`notifications-${user.id}`)
+        .send({
+          type: 'broadcast',
+          event: 'notification',
+          payload: {
+            title: 'Stock Purchase Successful',
+            message: `You purchased ${quantity} shares of ${symbol} for $${totalAmount.toFixed(2)}`,
+            data: {
+              type: 'success',
+              symbol,
+              quantity,
+              amount: totalAmount
+            }
+          }
+        });
+
+      // Also send to general channel
+      await supabase
+        .channel('notifications-general')
+        .send({
+          type: 'broadcast',
+          event: 'notification',
+          payload: {
+            title: 'Stock Purchase Successful',
+            message: `You purchased ${quantity} shares of ${symbol} for $${totalAmount.toFixed(2)}`,
+            data: {
+              type: 'success',
+              symbol,
+              quantity,
+              amount: totalAmount
+            }
+          }
+        });
 
       return NextResponse.json({
         success: true,
@@ -201,6 +242,42 @@ export async function POST(req: NextRequest) {
           stockResult,
         };
       });
+
+      // Send notification via Supabase
+      await supabase
+        .channel(`notifications-${user.id}`)
+        .send({
+          type: 'broadcast',
+          event: 'notification',
+          payload: {
+            title: 'Stock Sale Successful',
+            message: `You sold ${quantity} shares of ${symbol} for $${totalAmount.toFixed(2)}`,
+            data: {
+              type: 'success',
+              symbol,
+              quantity,
+              amount: totalAmount
+            }
+          }
+        });
+
+      // Also send to general channel
+      await supabase
+        .channel('notifications-general')
+        .send({
+          type: 'broadcast',
+          event: 'notification',
+          payload: {
+            title: 'Stock Sale Successful',
+            message: `You sold ${quantity} shares of ${symbol} for $${totalAmount.toFixed(2)}`,
+            data: {
+              type: 'success',
+              symbol,
+              quantity,
+              amount: totalAmount
+            }
+          }
+        });
 
       return NextResponse.json({
         success: true,
