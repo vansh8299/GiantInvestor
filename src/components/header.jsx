@@ -1,31 +1,40 @@
 import { signOut, getSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "./ui/button";
-import { Bell, Send } from "lucide-react";
-import cookies from 'js-cookie';
+import { Bell, Send, Clock, Calendar } from "lucide-react";
+import cookies from "js-cookie";
 import { useEffect, useState } from "react";
 import SearchDropdown from "./SearchDropdown";
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
 const Header = () => {
   const [token, setToken] = useState(null);
   const [googletoken, setGoogleToken] = useState(null);
   const [session, setSession] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showScheduleSettings, setShowScheduleSettings] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [supabaseClient, setSupabaseClient] = useState(null);
-  const [userId, setUserId] = useState(null)
+  const [userId, setUserId] = useState(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState(false);
-  
+  const [marketStatus, setMarketStatus] = useState("closed"); // 'open' or 'closed'
+  const [nextMarketOpen, setNextMarketOpen] = useState(null);
+  const [nextMarketClose, setNextMarketClose] = useState(null);
+  const [openHour, setOpenHour] = useState("9");
+  const [openMinute, setOpenMinute] = useState("15");
+  const [closeHour, setCloseHour] = useState("15");
+  const [closeMinute, setCloseMinute] = useState("30");
+  const [updateMessage, setUpdateMessage] = useState("");
+
   useEffect(() => {
     const checkAuth = async () => {
       // Check regular token
-      const tokenFromCookies = cookies.get('token');
+      const tokenFromCookies = cookies.get("token");
       setToken(tokenFromCookies);
 
       // Check Next.js session
-      const nextAuthToken = cookies.get('next-auth.session-token');
+      const nextAuthToken = cookies.get("next-auth.session-token");
       setGoogleToken(nextAuthToken);
 
       // Get Next.js session
@@ -34,15 +43,134 @@ const Header = () => {
     };
 
     checkAuth();
-    
+
     // Initialize Supabase only in browser environment
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       initializeSupabase();
+      fetchUserData();
+      checkMarketStatus();
+      fetchCronStatus();
+
+      // Initialize cron jobs on app start
+      initializeCronJobs();
     }
+
+    // Set up interval to check market status
+    const marketStatusInterval = setInterval(checkMarketStatus, 60000); // Check every minute
+
+    return () => {
+      clearInterval(marketStatusInterval);
+    };
   }, []);
+
+  // Fetch cron job status
+  const fetchCronStatus = async () => {
+    try {
+      const response = await fetch("/api/cron/setup");
+      if (response.ok) {
+        const data = await response.json();
+        if (data.nextRuns) {
+          setNextMarketOpen(data.nextRuns.marketOpen);
+          setNextMarketClose(data.nextRuns.marketClose);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching cron status:", error);
+    }
+  };
+
+  // Initialize cron jobs
+  const initializeCronJobs = async () => {
+    try {
+      const response = await fetch("/api/cron/setup");
+      if (response.ok) {
+        console.log("Cron jobs initialized successfully");
+        const data = await response.json();
+        if (data.nextRuns) {
+          setNextMarketOpen(data.nextRuns.marketOpen);
+          setNextMarketClose(data.nextRuns.marketClose);
+        }
+      } else {
+        console.error("Failed to initialize cron jobs");
+      }
+    } catch (error) {
+      console.error("Error initializing cron jobs:", error);
+    }
+  };
+
+  // Update cron schedule
+  const updateSchedule = async (type) => {
+    setIsLoading(true);
+    try {
+      let schedule;
+      if (type === "open") {
+        schedule = `${openMinute} ${openHour} * * 1-5`;
+      } else {
+        schedule = `${closeMinute} ${closeHour} * * 1-5`;
+      }
+      
+      const response = await fetch("/api/cron/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jobType: type,
+          schedule
+        }),
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        setUpdateMessage(`${type === "open" ? "Open" : "Close"} schedule updated successfully!`);
+        if (type === "open") {
+          setNextMarketOpen(data.nextRun);
+        } else {
+          setNextMarketClose(data.nextRun);
+        }
+        
+        // Clear message after 3 seconds
+        setTimeout(() => setUpdateMessage(""), 3000);
+      } else {
+        console.error("Failed to update schedule:", data.message);
+        setUpdateMessage(`Failed to update ${type} schedule`);
+      }
+    } catch (error) {
+      console.error(`Error updating ${type} schedule:`, error);
+      setUpdateMessage(`Error: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Check if market is open or closed
+  const checkMarketStatus = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const currentTime = hours * 60 + minutes;
+
+    // Check if it's a weekday (1-5 is Monday to Friday)
+    if (day >= 1 && day <= 5) {
+      // Market hours: 9:15 AM to 3:30 PM (IST)
+      const marketOpenTime = parseInt(openHour) * 60 + parseInt(openMinute);
+      const marketCloseTime = parseInt(closeHour) * 60 + parseInt(closeMinute);
+
+      if (currentTime >= marketOpenTime && currentTime < marketCloseTime) {
+        setMarketStatus("open");
+      } else {
+        setMarketStatus("closed");
+      }
+    } else {
+      // Weekend - market is closed
+      setMarketStatus("closed");
+    }
+  };
+
   const fetchUserData = async () => {
     try {
-      const response = await fetch('/actions/getuser');
+      const response = await fetch("/actions/getuser");
       if (response.ok) {
         const data = await response.json();
         if (data.user && data.user.id) {
@@ -50,261 +178,220 @@ const Header = () => {
         }
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error("Error fetching user data:", error);
     }
   };
+
   const initializeSupabase = async () => {
     try {
       // Initialize Supabase client
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      
+
       if (!supabaseUrl || !supabaseKey) {
-        console.error('Supabase environment variables not set');
+        console.error("Supabase environment variables not set");
         return;
       }
-      
+
       const supabase = createClient(supabaseUrl, supabaseKey);
       setSupabaseClient(supabase);
-      
+
+      // Set up Supabase realtime subscription for notifications
+      setupRealtimeSubscription(supabase);
+
       // Set up push notification permission
-      if ('Notification' in window) {
+      if ("Notification" in window) {
         const permission = await Notification.requestPermission();
-        console.log('Notification permission status:', permission);
-        
-        if (permission === 'granted') {
-          console.log('Notification permission granted.');
-          
-          // Set up Supabase realtime subscription for notifications
-          setupRealtimeSubscription(supabase);
-        } else {
-          console.log('Notification permission denied.');
-        }
+        console.log("Notification permission status:", permission);
       }
     } catch (error) {
-      console.error('Error initializing Supabase:', error);
+      console.error("Error initializing Supabase:", error);
     }
   };
-  
+
   const setupRealtimeSubscription = (supabase) => {
     if (!supabase) return;
-    
+
     try {
-      // Get the user ID from token or session
-   
-      
-      // Subscribe to a channel for notifications
-      const channel = supabase
-        .channel(`notifications-${userId || 'general'}`)
-        .on('broadcast', { event: 'notification' }, (payload) => {
-          console.log('Notification received:', payload);
-          const newNotification = {
-            id: Date.now().toString(),
-            title: payload.payload.title,
-            body: payload.payload.message,
-            timestamp: new Date().toISOString(),
-            read: false,
-            data: payload.payload.data || {}
-          };
-          
-          setNotifications(prev => [newNotification, ...prev]);
-        })
-        .subscribe(status => {
-          console.log('Subscription status:', status);
-          setSubscriptionStatus(status === 'SUBSCRIBED');
+      // Subscribe to both user-specific and general channels
+      const userChannel = supabase
+        .channel(`notifications-${userId || "user"}`)
+        .on("broadcast", { event: "notification" }, handleNotification)
+        .subscribe((status) => {
+          console.log("User channel subscription status:", status);
         });
-      
+
+      // Subscribe to general notifications channel
+      const generalChannel = supabase
+        .channel("notifications-general")
+        .on("broadcast", { event: "notification" }, handleNotification)
+        .subscribe((status) => {
+          console.log("General channel subscription status:", status);
+          setSubscriptionStatus(status === "SUBSCRIBED");
+        });
+
       return () => {
-        channel.unsubscribe();
+        userChannel.unsubscribe();
+        generalChannel.unsubscribe();
       };
     } catch (error) {
-      console.error('Error setting up realtime subscription:', error);
+      console.error("Error setting up realtime subscription:", error);
+    }
+  };
+
+  const handleNotification = (payload) => {
+    console.log("Notification received:", payload);
+    const newNotification = {
+      id: Date.now().toString(),
+      title: payload.payload.title,
+      body: payload.payload.message,
+      timestamp: new Date().toISOString(),
+      read: false,
+      data: payload.payload.data || {},
+    };
+
+    setNotifications((prev) => [newNotification, ...prev]);
+
+    // Show browser notification if supported
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(newNotification.title, {
+        body: newNotification.body,
+        icon: "/favicon.ico",
+      });
     }
   };
 
   const toggleNotifications = () => {
     setShowNotifications(!showNotifications);
+    if (showScheduleSettings) setShowScheduleSettings(false);
   };
-  
+
+  const toggleScheduleSettings = () => {
+    setShowScheduleSettings(!showScheduleSettings);
+    if (showNotifications) setShowNotifications(false);
+  };
+
   const markAsRead = (id) => {
-    setNotifications(prev => 
-      prev.map(notif => 
-        notif.id === id ? {...notif, read: true} : notif
-      )
+    setNotifications((prev) =>
+      prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif))
     );
   };
-  
+
   const clearAllNotifications = () => {
     setNotifications([]);
   };
+
   
-  // Function to create a local test notification
-  const createLocalTestNotification = () => {
-    const newNotification = {
-      id: Date.now().toString(),
-      title: "Local Test Notification",
-      body: "This is a local test notification.",
-      timestamp: new Date().toISOString(),
-      read: false,
-      data: { type: "test" }
-    };
-    
-    setNotifications(prev => [newNotification, ...prev]);
-  };
-  
-  // Function to trigger a test notification via the API
-  const triggerTestNotification = async () => {
-    if (!supabaseClient || !subscriptionStatus) {
-      createLocalTestNotification();
-      return;
+
+  // Generate time options
+  const generateTimeOptions = (start, end) => {
+    const options = [];
+    for (let i = start; i <= end; i++) {
+      options.push(
+        <option key={i} value={i.toString().padStart(2, "0")}>
+          {i.toString().padStart(2, "0")}
+        </option>
+      );
     }
-    
-    setIsLoading(true);
-    
-    try {
-      // Get userId from session or token
-      
-      
-      // Call our API endpoint
-      const response = await fetch('/api/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          title: 'Giant Investor Update',
-          message: 'This is a test notification from Giant Investor.',
-          data: {
-            type: 'test',
-            url: '/dashboard'
-          }
-        }),
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
-        console.log('Notification sent successfully:', result);
-        
-        // Add a local notification to confirm
-        setNotifications(prev => [{
-          id: Date.now().toString(),
-          title: "Success",
-          body: "Test notification sent successfully!",
-          timestamp: new Date().toISOString(),
-          read: false,
-          data: { type: "success" }
-        }, ...prev]);
-      } else {
-        console.error('Failed to send notification:', result);
-        
-        // Add error notification
-        setNotifications(prev => [{
-          id: Date.now().toString(),
-          title: "Error",
-          body: `Failed to send notification: ${result.message}`,
-          timestamp: new Date().toISOString(),
-          read: false,
-          data: { type: "error" }
-        }, ...prev]);
-      }
-    } catch (error) {
-      console.error('Error sending notification:', error);
-      
-      // Add error notification
-      setNotifications(prev => [{
-        id: Date.now().toString(),
-        title: "Error",
-        body: `Error sending notification: ${error.message}`,
-        timestamp: new Date().toISOString(),
-        read: false,
-        data: { type: "error" }
-      }, ...prev]);
-    } finally {
-      setIsLoading(false);
-    }
+    return options;
   };
 
   return (
     <nav className="fixed top-0 w-full bg-white border-b border-gray-200 z-10">
       <div className="flex items-center justify-between px-4 py-3">
         <Link href="/">
-          <div className="text-2xl font-bold text-green-600">Giant Investor</div>
+          <div className="text-2xl font-bold text-green-600">
+            Giant Investor
+          </div>
         </Link>
         <SearchDropdown />
         <div className="flex items-center gap-4">
-          {(token || googletoken || session) ? (
+          {token || googletoken || session ? (
             <>
-              {/* Test notification button */}
-              <Button 
-                onClick={triggerTestNotification} 
-                className="bg-blue-600 px-3 py-2 flex items-center gap-1"
-                disabled={isLoading}
+              {/* Market Status */}
+              <div
+                className={`flex items-center gap-1 text-sm px-2 py-1 rounded cursor-pointer ${
+                  marketStatus === "open"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-gray-100 text-gray-800"
+                }`}
+                onClick={toggleScheduleSettings}
               >
-                <Send size={16} />
-                <span className="text-sm">
-                  {isLoading ? 'Sending...' : subscriptionStatus ? 'Test Notification' : 'Local Notification'}
-                </span>
-              </Button>
-              
-              {/* Subscription Status - for debugging */}
-              {!subscriptionStatus && (
-                <div className="text-xs text-red-500">
-                  Not subscribed
-                </div>
-              )}
-              
+                <Clock size={16} />
+                <span>Market {marketStatus}</span>
+              </div>
+
+             
+
               {/* Notification bell */}
               <div className="relative">
-                <Button 
-                  onClick={toggleNotifications} 
+                <Button
+                  onClick={toggleNotifications}
                   className="bg-green-600 p-2 h-10 w-10 flex items-center justify-center relative"
                 >
                   <Bell size={20} />
                   {notifications.length > 0 && (
                     <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {notifications.filter(n => !n.read).length}
+                      {notifications.filter((n) => !n.read).length}
                     </div>
                   )}
                 </Button>
-                
+
                 {showNotifications && (
                   <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-md shadow-lg z-20 max-h-96 overflow-y-auto">
                     <div className="p-3 border-b border-gray-200 flex justify-between items-center">
                       <h3 className="text-lg font-medium">Notifications</h3>
-                      {notifications.length > 0 && (
-                        <Button 
-                          onClick={clearAllNotifications} 
-                          className="text-xs text-gray-500 hover:text-gray-700 p-1 h-auto"
-                          variant="ghost"
-                        >
-                          Clear all
-                        </Button>
-                      )}
+                      <div className="flex gap-2">
+                       
+
+                        {notifications.length > 0 && (
+                          <Button
+                            onClick={clearAllNotifications}
+                            className="text-xs text-gray-500 hover:text-gray-700 p-1 h-auto"
+                            variant="ghost"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    
+
                     <div className="divide-y divide-gray-200">
                       {notifications.length === 0 ? (
                         <div className="p-4 text-sm text-gray-500 text-center">
                           No notifications yet
                         </div>
                       ) : (
-                        notifications.map(notification => (
-                          <div 
-                            key={notification.id} 
+                        notifications.map((notification) => (
+                          <div
+                            key={notification.id}
                             className={`p-3 hover:bg-gray-50 cursor-pointer ${
-                              notification.read ? 'bg-white' : 
-                              notification.data?.type === 'error' ? 'bg-red-50' :
-                              notification.data?.type === 'success' ? 'bg-green-50' :
-                              'bg-blue-50'
+                              notification.read
+                                ? "bg-white"
+                                : notification.data?.type === "error"
+                                ? "bg-red-50"
+                                : notification.data?.type === "success"
+                                ? "bg-green-50"
+                                : notification.data?.type === "market"
+                                ? "bg-blue-50"
+                                : "bg-blue-50"
                             }`}
                             onClick={() => markAsRead(notification.id)}
                           >
-                            <div className="font-medium text-sm">{notification.title}</div>
-                            <div className="text-sm text-gray-600 mt-1">{notification.body}</div>
+                            <div className="font-medium text-sm">
+                              {notification.title}
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              {notification.body}
+                            </div>
                             <div className="text-xs text-gray-400 mt-1">
-                              {new Date(notification.timestamp).toLocaleTimeString()} · {new Date(notification.timestamp).toLocaleDateString()}
+                              {new Date(
+                                notification.timestamp
+                              ).toLocaleTimeString()}{" "}
+                              ·{" "}
+                              {new Date(
+                                notification.timestamp
+                              ).toLocaleDateString()}
                             </div>
                           </div>
                         ))
