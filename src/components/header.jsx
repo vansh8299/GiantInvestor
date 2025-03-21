@@ -62,6 +62,64 @@ const Header = () => {
       clearInterval(marketStatusInterval);
     };
   }, []);
+// Add this useEffect to fetch notifications whenever userId changes
+useEffect(() => {
+  if (userId) {
+    fetchNotifications();
+  }
+}, [userId]);
+  // Fetch persistent notifications from the database
+  const fetchNotifications = async () => {
+    if (!userId) return;
+    
+    try {
+      const response = await fetch("/api/notifications");
+      if (response.ok) {
+        const data = await response.json();
+        // Transform the data to match our notification format
+        const formattedNotifications = data.notifications.map(notification => ({
+          id: notification.id,
+          title: notification.title,
+          body: notification.message,
+          timestamp: notification.createdAt,
+          read: notification.read,
+          data: notification.metadata ? JSON.parse(notification.metadata) : {}
+        }));
+        
+        setNotifications(formattedNotifications);
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  };
+  
+  // Mark a notification as read in the database
+  const markNotificationAsRead = async (id) => {
+    try {
+      await fetch(`/api/notifications/${id}/read`, {
+        method: "PUT",
+      });
+      
+      // Update the local state
+      markAsRead(id);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+  
+  // Clear all notifications in the database
+  const clearAllNotificationsInDB = async () => {
+    try {
+      await fetch("/api/notifications/clear", {
+        method: "DELETE",
+      });
+      
+      // Update the local state
+      clearAllNotifications();
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+    }
+  };
 
   // Fetch cron job status
   const fetchCronStatus = async () => {
@@ -175,6 +233,8 @@ const Header = () => {
         const data = await response.json();
         if (data.user && data.user.id) {
           setUserId(data.user.id);
+          // Fetch notifications after we have the user ID
+          fetchNotifications();
         }
       }
     } catch (error) {
@@ -259,11 +319,19 @@ const Header = () => {
         icon: "/favicon.ico",
       });
     }
+    
+    // Refresh notifications from the database
+    fetchNotifications();
   };
 
   const toggleNotifications = () => {
     setShowNotifications(!showNotifications);
     if (showScheduleSettings) setShowScheduleSettings(false);
+    
+    // Fetch fresh notifications when opening the panel
+    if (!showNotifications) {
+      fetchNotifications();
+    }
   };
 
   const toggleScheduleSettings = () => {
@@ -280,8 +348,6 @@ const Header = () => {
   const clearAllNotifications = () => {
     setNotifications([]);
   };
-
-  
 
   // Generate time options
   const generateTimeOptions = (start, end) => {
@@ -321,8 +387,6 @@ const Header = () => {
                 <span>Market {marketStatus}</span>
               </div>
 
-             
-
               {/* Notification bell */}
               <div className="relative">
                 <Button
@@ -342,11 +406,9 @@ const Header = () => {
                     <div className="p-3 border-b border-gray-200 flex justify-between items-center">
                       <h3 className="text-lg font-medium">Notifications</h3>
                       <div className="flex gap-2">
-                       
-
                         {notifications.length > 0 && (
                           <Button
-                            onClick={clearAllNotifications}
+                            onClick={clearAllNotificationsInDB}
                             className="text-xs text-gray-500 hover:text-gray-700 p-1 h-auto"
                             variant="ghost"
                           >
@@ -376,7 +438,7 @@ const Header = () => {
                                 ? "bg-blue-50"
                                 : "bg-blue-50"
                             }`}
-                            onClick={() => markAsRead(notification.id)}
+                            onClick={() => markNotificationAsRead(notification.id)}
                           >
                             <div className="font-medium text-sm">
                               {notification.title}

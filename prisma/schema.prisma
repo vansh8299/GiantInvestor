@@ -1,113 +1,130 @@
-generator client {
-  provider = "prisma-client-js"
-}
+  generator client {
+    provider = "prisma-client-js"
+  }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+  datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+  }
 
 
-model User {
-  id                      String       @id @default(cuid())
-  firstName               String
-  lastName                String
-  email                   String       @unique
-  password                String
-  otp                     String?
-  otpExpiry               DateTime?
-  emailVerified           DateTime?
-  passwordResetRequested  Boolean      @default(false)
-  passwordResetVerified   Boolean      @default(false)
-  isVerified              Boolean      @default(false)
-  balance                 Float        @default(0)
-  createdAt               DateTime     @default(now())
-  updatedAt               DateTime     @updatedAt
-  image                   String?
-  transactionOtpVerified  Boolean      @default(false)
-  accounts                Account[]
-  sessions                Session[]
-  transactions            Transaction[]
-  stocks                  Stock[]
-  chatMessages            ChatMessage[]
-}
-model ChatMessage {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  text      String
-  sender    String   // 'user' or 'bot'
-  createdAt DateTime @default(now())
+  model User {
+    id                      String       @id @default(cuid())
+    firstName               String
+    lastName                String
+    email                   String       @unique
+    password                String
+    otp                     String?
+    otpExpiry               DateTime?
+    emailVerified           DateTime?
+    passwordResetRequested  Boolean      @default(false)
+    passwordResetVerified   Boolean      @default(false)
+    isVerified              Boolean      @default(false)
+    balance                 Float        @default(0)
+    createdAt               DateTime     @default(now())
+    updatedAt               DateTime     @updatedAt
+    image                   String?
+    transactionOtpVerified  Boolean      @default(false)
+    accounts                Account[]
+    sessions                Session[]
+    transactions            Transaction[]
+    stocks                  Stock[]
+    chatMessages            ChatMessage[]
+    notifications           Notification[]
+  }
 
-  @@index([userId])
-}
+  model Notification {
+    id        String   @id @default(uuid())
+    userId    String
+    title     String
+    message   String
+    type      String
+    metadata  String?  // Stored as JSON string
+    read      Boolean  @default(false)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    
+    user      User     @relation(fields: [userId], references: [id])
 
-model OtpVerification {
-  id        String   @id @default(cuid())
-  email     String
-  otp       String
-  type      String   // 'registration', 'reset', 'transaction'
-  metadata  Json?    // Store additional context like transaction details
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-}
-model Stock {
-  id              String    @id @default(cuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id])
-  symbol          String
-  quantity        Int
-  purchasePrice   Float
-  currentPrice    Float
-  purchasedAt     DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+    @@index([userId])
+  }
+  model ChatMessage {
+    id        String   @id @default(cuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id])
+    text      String
+    sender    String   // 'user' or 'bot'
+    createdAt DateTime @default(now())
 
-  @@index([userId])
-  @@index([symbol])
-}
+    @@index([userId])
+  }
 
-model Transaction {
-  id                String    @id @default(cuid())
-  userId            String
-  user              User      @relation(fields: [userId], references: [id])
-  amount            Float
-  type              String    // "deposit", "withdrawal", etc.
-  status            String    // "pending", "completed", "failed"
-  razorpayPaymentId String?
-  razorpayOrderId   String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-}
-model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
-  user               User    @relation(fields: [userId], references: [id])
+  model OtpVerification {
+    id        String   @id @default(cuid())
+    email     String
+    otp       String
+    type      String   // 'registration', 'reset', 'transaction'
+    metadata  Json?    // Store additional context like transaction details
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+  }
+  model Stock {
+    id              String    @id @default(cuid())
+    userId          String
+    user            User      @relation(fields: [userId], references: [id])
+    symbol          String
+    quantity        Int
+    purchasePrice   Float
+    currentPrice    Float
+    purchasedAt     DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
 
-  @@unique([provider, providerAccountId])
-}
+    @@index([userId])
+    @@index([symbol])
+  }
 
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id])
-}
+  model Transaction {
+    id                String    @id @default(cuid())
+    userId            String
+    user              User      @relation(fields: [userId], references: [id])
+    amount            Float
+    type              String    // "deposit", "withdrawal", etc.
+    status            String    // "pending", "completed", "failed"
+    razorpayPaymentId String?
+    razorpayOrderId   String?
+    createdAt         DateTime  @default(now())
+    updatedAt         DateTime  @updatedAt
+  }
+  model Account {
+    id                 String  @id @default(cuid())
+    userId             String
+    type               String
+    provider           String
+    providerAccountId  String
+    refresh_token      String?
+    access_token       String?
+    expires_at         Int?
+    token_type         String?
+    scope              String?
+    id_token           String?
+    session_state      String?
+    user               User    @relation(fields: [userId], references: [id])
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
+    @@unique([provider, providerAccountId])
+  }
 
-  @@unique([identifier, token])
-}
+  model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique
+    userId       String
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id])
+  }
+
+  model VerificationToken {
+    identifier String
+    token      String   @unique
+    expires    DateTime
+
+    @@unique([identifier, token])
+  }

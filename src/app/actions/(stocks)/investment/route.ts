@@ -128,13 +128,29 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // Create a persistent notification in the database
+        await tx.notification.create({
+          data: {
+            userId: user.id,
+            title: 'Stock Purchase Successful',
+            message: `You purchased ${quantity} shares of ${symbol} for $${totalAmount.toFixed(2)}`,
+            type: 'success',
+            metadata: JSON.stringify({
+              symbol,
+              quantity,
+              amount: totalAmount
+            }),
+            read: false
+          }
+        });
+
         return {
           updatedUser,
           stockResult,
         };
       });
 
-      // Send notification via Supabase
+      // Send realtime notification via Supabase
       await supabase
         .channel(`notifications-${user.id}`)
         .send({
@@ -237,13 +253,29 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // Create a persistent notification in the database
+        await tx.notification.create({
+          data: {
+            userId: user.id,
+            title: 'Stock Sale Successful',
+            message: `You sold ${quantity} shares of ${symbol} for $${totalAmount.toFixed(2)}`,
+            type: 'success',
+            metadata: JSON.stringify({
+              symbol,
+              quantity,
+              amount: totalAmount
+            }),
+            read: false
+          }
+        });
+
         return {
           updatedUser,
           stockResult,
         };
       });
 
-      // Send notification via Supabase
+      // Send realtime notification via Supabase
       await supabase
         .channel(`notifications-${user.id}`)
         .send({

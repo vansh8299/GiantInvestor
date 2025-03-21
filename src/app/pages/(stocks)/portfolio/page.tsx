@@ -381,7 +381,7 @@ const Portfolio: React.FC = () => {
         toast.success(data.message);
         setSelectedStock(null);
         setQuantity(1);
-        // window.location.reload();
+        window.location.reload();
       }
     } catch (error) {
       console.error('Transaction error:', error);
