@@ -1,5 +1,6 @@
 import { CronJob } from "cron";
 import { createClient } from "@supabase/supabase-js";
+import { db } from "@/lib/prisma"; // Add Prisma import for database access
 
 // Initialize Supabase client
 const getSupabaseAdmin = () => {
@@ -18,13 +19,18 @@ let marketOpenJob = null;
 let marketCloseJob = null;
 let debugJob = null;
 
+// Helper function to create a delay
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Function to send notification
-const sendNotification = async (title, message, type = "info") => {
+const sendNotification = async (title, message, type = "info", userId = null) => {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Broadcast to general channel
-    const channel = "notifications-general";
+    // Determine which channel to use based on whether userId is provided
+    const channel = userId 
+      ? `notifications-${userId}` 
+      : "notifications-general";
 
     // Send notification via Supabase Realtime
     const { error } = await supabase.channel(channel).send({
@@ -47,7 +53,7 @@ const sendNotification = async (title, message, type = "info") => {
 
     // Save the notification to database
     const { error: dbError } = await supabase.from("notifications").insert({
-      user_id: null, // General notification
+      user_id: userId, // User-specific or general notification
       title,
       message,
       data: {
@@ -62,11 +68,104 @@ const sendNotification = async (title, message, type = "info") => {
     }
 
     console.log(
-      `Notification sent: ${title} at ${new Date().toLocaleTimeString()}`
+      `Notification sent: ${title} to ${userId || 'general'} at ${new Date().toLocaleTimeString()}`
     );
     return true;
   } catch (error) {
     console.error("Error in sendNotification:", error);
+    return false;
+  }
+};
+
+// Calculate and send profit/loss notifications to all users
+const sendProfitLossNotifications = async () => {
+  try {
+    console.log("Starting to calculate profit/loss for all users");
+    
+    // Get all users who have stocks
+    const usersWithStocks = await db.user.findMany({
+      where: {
+        stocks: {
+          some: {} // Any user who has at least one stock
+        }
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        stocks: {
+          select: {
+            symbol: true,
+            quantity: true,
+            purchasePrice: true,
+            currentPrice: true
+          }
+        }
+      }
+    });
+    
+    console.log(`Found ${usersWithStocks.length} users with stocks to notify`);
+    
+    // Process each user
+    for (const user of usersWithStocks) {
+      let totalProfitLoss = 0;
+      let stockSummary = [];
+      
+      // Calculate profit/loss for each stock
+      for (const stock of user.stocks) {
+        const stockProfitLoss = (stock.currentPrice - stock.purchasePrice) * stock.quantity;
+        totalProfitLoss += stockProfitLoss;
+        
+        // Add to summary for detailed notification
+        stockSummary.push({
+          symbol: stock.symbol,
+          quantity: stock.quantity,
+          profitLoss: stockProfitLoss
+        });
+      }
+      
+      // Create notification message
+      const isProfitable = totalProfitLoss >= 0;
+      const notificationType = isProfitable ? "success" : "warning";
+      const profitLossFormatted = Math.abs(totalProfitLoss).toFixed(2);
+      
+      const title = isProfitable 
+        ? `Daily Profit: $${profitLossFormatted}`
+        : `Daily Loss: $${profitLossFormatted}`;
+        
+      const message = isProfitable
+        ? `Today you made a profit of $${profitLossFormatted} across all your stocks.`
+        : `Today you have a loss of $${profitLossFormatted} across all your stocks.`;
+      
+      // Store in database and send notification
+      await db.notification.create({
+        data: {
+          userId: user.id,
+          title: title,
+          message: message,
+          type: notificationType,
+          metadata: JSON.stringify({
+            totalProfitLoss: totalProfitLoss,
+            stocks: stockSummary
+          }),
+          read: false
+        }
+      });
+      
+      // Send via Supabase
+      await sendNotification(
+        title,
+        message,
+        notificationType,
+        user.id
+      );
+      
+      console.log(`Sent profit/loss notification to user ${user.id}: ${totalProfitLoss >= 0 ? 'Profit' : 'Loss'} of $${profitLossFormatted}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error sending profit/loss notifications:", error);
     return false;
   }
 };
@@ -101,12 +200,14 @@ const createCronJobs = () => {
 
   // Market close notification job - runs every weekday at exactly 3:30 PM (IST)
   marketCloseJob = new CronJob(
-    "30 15 * * 1-5", // Minute Hour Day Month DayOfWeek
+    "09 19 * * 1-5", // Minute Hour Day Month DayOfWeek
     async function () {
       console.log(
         "Market close job triggered at:",
         new Date().toLocaleTimeString()
       );
+      
+      // Send general market close notification
       const success = await sendNotification(
         "Market Close",
         "The market has now closed for the day at 3:30 PM.",
@@ -115,6 +216,20 @@ const createCronJobs = () => {
 
       if (success) {
         console.log("Market close notification sent successfully");
+        
+        // Wait for 2 seconds before sending profit/loss notifications
+        console.log("Waiting 2 seconds before sending profit/loss notifications...");
+        await delay(2000); // 2 second delay
+        
+        // After delay, send individual profit/loss notifications
+        console.log("Now sending individual profit/loss notifications to users");
+        const profitLossSuccess = await sendProfitLossNotifications();
+        
+        if (profitLossSuccess) {
+          console.log("Profit/loss notifications sent successfully to all users");
+        } else {
+          console.error("Failed to send profit/loss notifications to some users");
+        }
       } else {
         console.error("Failed to send market close notification");
       }
@@ -124,8 +239,6 @@ const createCronJobs = () => {
     "Asia/Kolkata", // IST timezone
     false
   );
-
-
 };
 
 // Function to update cron schedule
@@ -239,11 +352,25 @@ export const triggerMarketNotification = async (type) => {
       "The market has now opened for trading at 9:15 AM.",
       "market"
     );
-  } else {
-    return await sendNotification(
+  } else if (type === "close") {
+    // First send the market close notification
+    const success = await sendNotification(
       "Market Close",
       "The market has now closed for the day at 3:30 PM.",
       "market"
     );
+    
+    if (success) {
+      // Wait for 2 seconds before sending profit/loss notifications
+      console.log("Waiting 2 seconds before sending profit/loss notifications...");
+      await delay(2000); // 2 second delay
+      
+      // Then send profit/loss notifications
+      return await sendProfitLossNotifications();
+    }
+    return success;
+  } else if (type === "profit-loss-only") {
+    // For testing profit/loss notifications without market close
+    return await sendProfitLossNotifications();
   }
 };
