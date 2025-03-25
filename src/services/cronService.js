@@ -78,6 +78,7 @@ const sendNotification = async (title, message, type = "info", userId = null) =>
 };
 
 // Calculate and send profit/loss notifications to all users
+// Updated sendProfitLossNotifications function
 const sendProfitLossNotifications = async () => {
   try {
     console.log("Starting to calculate profit/loss for all users");
@@ -95,6 +96,7 @@ const sendProfitLossNotifications = async () => {
         lastName: true,
         stocks: {
           select: {
+            id: true,
             symbol: true,
             quantity: true,
             purchasePrice: true,
@@ -113,15 +115,90 @@ const sendProfitLossNotifications = async () => {
       
       // Calculate profit/loss for each stock
       for (const stock of user.stocks) {
-        const stockProfitLoss = (stock.currentPrice - stock.purchasePrice) * stock.quantity;
-        totalProfitLoss += stockProfitLoss;
+        let latestPrice = stock.currentPrice;
         
+        try {
+          // First try daily data - IMPORTANT: Use the correct API endpoint
+          const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${stock.symbol}&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`;
+          
+          console.log(`Fetching daily data for ${stock.symbol} from: ${apiUrl}`);
+          
+          const dailyRes = await fetch(apiUrl);
+          if (!dailyRes.ok) {
+            throw new Error(`API request failed with status ${dailyRes.status}`);
+          }
+          
+          const dailyData = await dailyRes.json();
+          
+          // Debug: Log the API response
+          console.log(`API response for ${stock.symbol}:`, JSON.stringify(dailyData, null, 2));
+          
+          if (!dailyData["Time Series (Daily)"]) {
+            throw new Error("No time series data in response");
+          }
+          
+          const timeSeriesDaily = dailyData["Time Series (Daily)"];
+          const dates = Object.keys(timeSeriesDaily).sort().reverse(); // Get dates in descending order
+          
+          if (dates.length > 0) {
+            const latestDate = dates[0]; // Get the most recent date
+            latestPrice = parseFloat(timeSeriesDaily[latestDate]["5. adjusted close"]);
+            console.log(`Latest price for ${stock.symbol} on ${latestDate}: ${latestPrice}`);
+          }
+        } catch (e) {
+          console.error(`Error fetching daily data for ${stock.symbol}:`, e);
+          
+          // If daily fails, try weekly as fallback
+          try {
+            const weeklyApiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_WEEKLY_ADJUSTED&symbol=${stock.symbol}&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`;
+            console.log(`Falling back to weekly data for ${stock.symbol}`);
+            
+            const weeklyRes = await fetch(weeklyApiUrl);
+            if (!weeklyRes.ok) {
+              throw new Error(`Weekly API request failed with status ${weeklyRes.status}`);
+            }
+            
+            const weeklyData = await weeklyRes.json();
+            
+            if (!weeklyData["Weekly Adjusted Time Series"]) {
+              throw new Error("No weekly time series data in response");
+            }
+            
+            const timeSeriesWeekly = weeklyData["Weekly Adjusted Time Series"];
+            const weeklyDates = Object.keys(timeSeriesWeekly).sort().reverse();
+            
+            if (weeklyDates.length > 0) {
+              const latestWeeklyDate = weeklyDates[0];
+              latestPrice = parseFloat(timeSeriesWeekly[latestWeeklyDate]["5. adjusted close"]);
+              console.log(`Weekly fallback price for ${stock.symbol} on ${latestWeeklyDate}: ${latestPrice}`);
+            }
+          } catch (weeklyError) {
+            console.error(`Error fetching weekly data for ${stock.symbol}:`, weeklyError);
+            // If both fail, we'll use the currentPrice from the database
+            console.log(`Using current price from database for ${stock.symbol}: ${latestPrice}`);
+          }
+        }
+        
+        // Calculate with the latest price
+        const stockProfitLoss = (latestPrice - stock.purchasePrice) * stock.quantity;
+        totalProfitLoss += stockProfitLoss;
+      
         // Add to summary for detailed notification
         stockSummary.push({
           symbol: stock.symbol,
           quantity: stock.quantity,
-          profitLoss: stockProfitLoss
+          profitLoss: stockProfitLoss,
+          latestPrice: latestPrice
         });
+        
+        // Update the currentPrice in database if it changed
+        if (latestPrice !== stock.currentPrice) {
+          await db.stock.update({
+            where: { id: stock.id },
+            data: { currentPrice: latestPrice }
+          });
+          console.log(`Updated price for ${stock.symbol} to ${latestPrice}`);
+        }
       }
       
       // Create notification message
@@ -169,7 +246,6 @@ const sendProfitLossNotifications = async () => {
     return false;
   }
 };
-
 // Create cron jobs with specified configurations
 const createCronJobs = () => {
   // Market open notification job - runs every weekday at exactly 9:15 AM (IST)
@@ -200,7 +276,7 @@ const createCronJobs = () => {
 
   // Market close notification job - runs every weekday at exactly 3:30 PM (IST)
   marketCloseJob = new CronJob(
-    "09 19 * * 1-5", // Minute Hour Day Month DayOfWeek
+    "44 18 * * 1-5", // Minute Hour Day Month DayOfWeek
     async function () {
       console.log(
         "Market close job triggered at:",
