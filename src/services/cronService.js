@@ -276,7 +276,7 @@ const createCronJobs = () => {
 
   // Market close notification job - runs every weekday at exactly 3:30 PM (IST)
   marketCloseJob = new CronJob(
-    "44 18 * * 1-5", // Minute Hour Day Month DayOfWeek
+    "30 15 * * 1-5", // Minute Hour Day Month DayOfWeek
     async function () {
       console.log(
         "Market close job triggered at:",
