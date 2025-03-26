@@ -289,7 +289,7 @@ const StockList = ({ stocks }: { stocks: Stock[] | undefined }) => {
             <div className="font-medium">{stock.ticker}</div>
             <div className="text-sm text-gray-600">${stock.price}</div>
           </div>
-          <div className={`text-sm ${stock.change_percentage.includes('+') ? 'text-green-500' : 'text-red-500'}`}>
+          <div className={`text-sm ${stock.change_percentage.includes('-') ? 'text-red-500' : 'text-green-500'}`}>
             {stock.change_percentage}
           </div>
         </div>

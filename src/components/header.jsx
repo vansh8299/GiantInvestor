@@ -271,56 +271,66 @@ useEffect(() => {
 // Add this useEffect to properly set up subscriptions when userId changes
 useEffect(() => {
   if (userId && supabaseClient) {
-    // Clean up any existing subscriptions
     const cleanup = setupRealtimeSubscription(supabaseClient);
-    
-    // Return cleanup function
     return () => {
       if (cleanup) cleanup();
     };
   }
 }, [userId, supabaseClient]);
-  const setupRealtimeSubscription = (supabase) => {
-    if (!supabase || !userId) return () => {};
-  
-    let userChannel;
-    let generalChannel;
-  
-    try {
-      // Subscribe to user-specific channel
-      userChannel = supabase
-        .channel(`notifications-${userId}`)
-        .on("broadcast", { event: "notification" }, handleNotification)
-        .subscribe();
-  
-      // Subscribe to general notifications channel
-      generalChannel = supabase
-        .channel("notifications-general")
-        .on("broadcast", { event: "notification" }, handleNotification)
-        .subscribe((status) => {
-          console.log("General channel subscription status:", status);
-          setSubscriptionStatus(status === "SUBSCRIBED");
-        });
-  
-    } catch (error) {
-      console.error("Error setting up realtime subscription:", error);
-    }
-  
-    // Return cleanup function
-    return () => {
-      if (userChannel) userChannel.unsubscribe();
-      if (generalChannel) generalChannel.unsubscribe();
-    };
+const setupRealtimeSubscription = (supabase) => {
+  if (!supabase || !userId) return () => {};
+
+  let userChannel;
+  let generalChannel;
+
+  try {
+    // Unsubscribe any existing channels first
+    supabase.removeAllChannels();
+
+    // Subscribe to user-specific channel
+    userChannel = supabase
+      .channel(`notifications-${userId}`)
+      .on("broadcast", { event: "notification" }, (payload) => {
+        handleNotification(payload);
+        // Force update the notification count
+        fetchNotifications();
+      })
+      .subscribe();
+
+    // Subscribe to general notifications channel
+    generalChannel = supabase
+      .channel("notifications-general")
+      .on("broadcast", { event: "notification" }, (payload) => {
+        handleNotification(payload);
+        // Force update the notification count
+        fetchNotifications();
+      })
+      .subscribe((status) => {
+        console.log("General channel subscription status:", status);
+        setSubscriptionStatus(status === "SUBSCRIBED");
+      });
+
+  } catch (error) {
+    console.error("Error setting up realtime subscription:", error);
+  }
+
+  // Return cleanup function
+  return () => {
+    if (userChannel) supabase.removeChannel(userChannel);
+    if (generalChannel) supabase.removeChannel(generalChannel);
   };
-  const handleNotification = (payload) => {
-    console.log("Full notification payload:", payload);
-    
-    // Check if this notification is intended for the current user
-    if (payload.payload.data?.userId && payload.payload.data.userId !== userId) {
-      console.log("Notification not for this user, skipping");
-      return;
-    }
+};
+const handleNotification = (payload) => {
+  console.log("Full notification payload:", payload);
   
+  // Check if this notification is intended for the current user
+  if (payload.payload.data?.userId && payload.payload.data.userId !== userId) {
+    console.log("Notification not for this user, skipping");
+    return;
+  }
+
+  // Update the notifications count immediately
+  setNotifications(prev => {
     const newNotification = {
       id: payload.payload.data?.id || Date.now().toString(),
       title: payload.payload.title,
@@ -329,22 +339,17 @@ useEffect(() => {
       read: false,
       data: payload.payload.data || {},
     };
-  
-    setNotifications((prev) => [newNotification, ...prev]);
-  
-    // Show browser notification if supported
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(newNotification.title, {
-        body: newNotification.body,
-        icon: "/favicon.ico",
-      });
-    }
-    
-    // Optional: Immediately mark as read if desired
-    if (newNotification.id) {
-      markNotificationAsRead(newNotification.id);
-    }
-  };
+    return [newNotification, ...prev];
+  });
+
+  // Show browser notification if supported
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(payload.payload.title, {
+      body: payload.payload.message,
+      icon: "/favicon.ico",
+    });
+  }
+};
   const toggleNotifications = () => {
     setShowNotifications(!showNotifications);
     if (showScheduleSettings) setShowScheduleSettings(false);

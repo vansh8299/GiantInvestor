@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
+import { createClient } from "@supabase/supabase-js";
 
 const prisma = new PrismaClient();
 
@@ -39,7 +40,8 @@ export async function POST(request: Request) {
 
     // Retrieve the transaction to make sure it exists and check its current status
     const transaction = await prisma.transaction.findUnique({
-      where: { id: transactionId }
+      where: { id: transactionId },
+      include: { user: true } // Include user details for notification
     });
 
     if (!transaction) {
@@ -63,10 +65,11 @@ export async function POST(request: Request) {
         razorpayPaymentId: razorpay_payment_id,
         status: 'completed',
       },
+      include: { user: true }
     });
 
     // Update the user's balance ONLY after successful verification
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: updatedTransaction.userId },
       data: {
         balance: {
@@ -75,7 +78,63 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    // Create a persistent notification in the database
+    await prisma.notification.create({
+      data: {
+        userId: updatedTransaction.userId,
+        title: 'Payment Successful',
+        message: `Your payment of ₹${updatedTransaction.amount.toFixed(2)} was successful. Your new balance is ₹${updatedUser.balance.toFixed(2)}`,
+        type: 'success',
+        metadata: JSON.stringify({
+          amount: updatedTransaction.amount,
+          newBalance: updatedUser.balance
+        }),
+        read: false
+      }
+    });
+
+    // Initialize Supabase client for realtime notification
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Send realtime notification via Supabase
+    await supabase
+      .channel(`notifications-${updatedTransaction.userId}`)
+      .send({
+        type: 'broadcast',
+        event: 'notification',
+        payload: {
+          title: 'Payment Successful',
+          message: `Your payment of ₹${updatedTransaction.amount.toFixed(2)} was successful. Your new balance is ₹${updatedUser.balance.toFixed(2)}`,
+          data: {
+            type: 'success',
+            amount: updatedTransaction.amount,
+            newBalance: updatedUser.balance
+          }
+        }
+      });
+
+    // Also send to general channel if needed
+    await supabase
+      .channel('notifications-general')
+      .send({
+        type: 'broadcast',
+        event: 'notification',
+        payload: {
+          title: 'Payment Successful',
+          message: `A payment of ₹${updatedTransaction.amount.toFixed(2)} was processed`,
+          data: {
+            type: 'info'
+          }
+        }
+      });
+
+    return NextResponse.json({ 
+      success: true,
+      message: `Payment of ₹${updatedTransaction.amount.toFixed(2)} verified successfully`,
+      newBalance: updatedUser.balance
+    }, { status: 200 });
   } catch (error) {
     console.error('Error verifying payment:', error);
     return NextResponse.json({ 

@@ -207,8 +207,8 @@ const sendProfitLossNotifications = async () => {
       const profitLossFormatted = Math.abs(totalProfitLoss).toFixed(2);
       
       const title = isProfitable 
-        ? `Daily Profit: $${profitLossFormatted}`
-        : `Daily Loss: $${profitLossFormatted}`;
+        ? `Total Profit: $${profitLossFormatted}`
+        : `Total Loss: $${profitLossFormatted}`;
         
       const message = isProfitable
         ? `Today you made a profit of $${profitLossFormatted} across all your stocks.`
@@ -276,7 +276,7 @@ const createCronJobs = () => {
 
   // Market close notification job - runs every weekday at exactly 3:30 PM (IST)
   marketCloseJob = new CronJob(
-    "30 15 * * 1-5", // Minute Hour Day Month DayOfWeek
+    "30 15  * * 1-5", // Minute Hour Day Month DayOfWeek
     async function () {
       console.log(
         "Market close job triggered at:",

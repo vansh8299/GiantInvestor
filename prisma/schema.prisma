@@ -48,16 +48,16 @@
 
     @@index([userId])
   }
-  model ChatMessage {
-    id        String   @id @default(cuid())
-    userId    String
-    user      User     @relation(fields: [userId], references: [id])
-    text      String
-    sender    String   // 'user' or 'bot'
-    createdAt DateTime @default(now())
-
-    @@index([userId])
-  }
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  text      String
+  sender    String   // 'user' or 'bot'
+  createdAt DateTime @default(now())
+  expiresAt DateTime @default(dbgenerated("(NOW() + INTERVAL '1 day')")) // PostgreSQL syntax
+  @@index([userId])
+}
 
   model OtpVerification {
     id        String   @id @default(cuid())

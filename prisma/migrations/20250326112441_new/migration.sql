@@ -42,6 +42,7 @@ CREATE TABLE "ChatMessage" (
     "text" TEXT NOT NULL,
     "sender" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL DEFAULT (NOW() + INTERVAL '1 day'),
 
     CONSTRAINT "ChatMessage_pkey" PRIMARY KEY ("id")
 );
