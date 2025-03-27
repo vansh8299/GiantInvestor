@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { db } from "@/lib/prisma";
 import jwt from 'jsonwebtoken';
 import { createClient } from "@supabase/supabase-js";
+import { isMarketOpen, getNextMarketOpenTime } from "@/lib/services/orderService";
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,6 +45,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate quantity is positive integer
+    if (!Number.isInteger(quantity)) {
+      return NextResponse.json(
+        { error: "Quantity must be a whole number" },
+        { status: 400 }
+      );
+    }
+
+    if (quantity <= 0) {
+      return NextResponse.json(
+        { error: "Quantity must be greater than 0" },
+        { status: 400 }
+      );
+    }
+
     // Get user from database
     const user = await db.user.findUnique({
       where: { email: token.email as string },
@@ -53,6 +70,49 @@ export async function POST(req: NextRequest) {
         { error: "User not found" },
         { status: 404 }
       );
+    }
+
+    // Check if market is open
+    const marketOpen = isMarketOpen();
+
+    if (!marketOpen) {
+      // Queue the order for next market open
+      const nextMarketOpen = getNextMarketOpenTime();
+      
+      const queuedOrder = await db.queuedOrder.create({
+        data: {
+          userId: user.id,
+          symbol,
+          quantity,
+          price,
+          actionType,
+          scheduledAt: nextMarketOpen,
+        },
+      });
+
+      // Create notification about queued order
+      await db.notification.create({
+        data: {
+          userId: user.id,
+          title: 'Order Queued',
+          message: `Your ${actionType} order for ${quantity} shares of ${symbol} has been queued for execution at market open`,
+          type: 'info',
+          metadata: JSON.stringify({
+            symbol,
+            quantity,
+            price,
+            actionType,
+            scheduledAt: nextMarketOpen
+          }),
+          read: false
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Order queued for next market open",
+        data: queuedOrder,
+      });
     }
 
     // Calculate total transaction amount
@@ -74,7 +134,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Start a transaction to ensure data consistency
-      const result = await db.$transaction(async (tx) => {
+      const result = await db.$transaction(async (tx: { user: { update: (arg0: { where: { id: any; }; data: { balance: number; }; }) => any; }; stock: { findFirst: (arg0: { where: { userId: any; symbol: any; }; }) => any; update: (arg0: { where: { id: any; }; data: { quantity: any; purchasePrice: number; currentPrice: any; updatedAt: Date; }; }) => any; create: (arg0: { data: { userId: any; symbol: any; quantity: any; purchasePrice: any; currentPrice: any; }; }) => any; }; transaction: { create: (arg0: { data: { userId: any; amount: number; type: string; status: string; }; }) => any; }; notification: { create: (arg0: { data: { userId: any; title: string; message: string; type: string; metadata: string; read: boolean; }; }) => any; }; }) => {
         // Deduct amount from user balance
         const updatedUser = await tx.user.update({
           where: { id: user.id },
@@ -168,24 +228,6 @@ export async function POST(req: NextRequest) {
           }
         });
 
-      // Also send to general channel
-      await supabase
-        .channel('notifications-general')
-        .send({
-          type: 'broadcast',
-          event: 'notification',
-          payload: {
-            title: 'Stock Purchase Successful',
-            message: `You purchased ${quantity} shares of ${symbol} for $${totalAmount.toFixed(2)}`,
-            data: {
-              type: 'success',
-              symbol,
-              quantity,
-              amount: totalAmount
-            }
-          }
-        });
-
       return NextResponse.json({
         success: true,
         message: `Successfully purchased ${quantity} shares of ${symbol}`,
@@ -217,7 +259,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Start a transaction to ensure data consistency
-      const result = await db.$transaction(async (tx) => {
+      const result = await db.$transaction(async (tx: { user: { update: (arg0: { where: { id: any; }; data: { balance: any; }; }) => any; }; stock: { delete: (arg0: { where: { id: any; }; }) => any; update: (arg0: { where: { id: any; }; data: { quantity: number; currentPrice: any; updatedAt: Date; }; }) => any; }; transaction: { create: (arg0: { data: { userId: any; amount: number; type: string; status: string; }; }) => any; }; notification: { create: (arg0: { data: { userId: any; title: string; message: string; type: string; metadata: string; read: boolean; }; }) => any; }; }) => {
         // Add amount to user balance
         const updatedUser = await tx.user.update({
           where: { id: user.id },
@@ -278,24 +320,6 @@ export async function POST(req: NextRequest) {
       // Send realtime notification via Supabase
       await supabase
         .channel(`notifications-${user.id}`)
-        .send({
-          type: 'broadcast',
-          event: 'notification',
-          payload: {
-            title: 'Stock Sale Successful',
-            message: `You sold ${quantity} shares of ${symbol} for $${totalAmount.toFixed(2)}`,
-            data: {
-              type: 'success',
-              symbol,
-              quantity,
-              amount: totalAmount
-            }
-          }
-        });
-
-      // Also send to general channel
-      await supabase
-        .channel('notifications-general')
         .send({
           type: 'broadcast',
           event: 'notification',

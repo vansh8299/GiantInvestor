@@ -36,6 +36,22 @@ CREATE TABLE "Notification" (
 );
 
 -- CreateTable
+CREATE TABLE "QueuedOrder" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "symbol" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL,
+    "price" DOUBLE PRECISION NOT NULL,
+    "actionType" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "scheduledAt" TIMESTAMP(3) NOT NULL,
+    "executedAt" TIMESTAMP(3),
+
+    CONSTRAINT "QueuedOrder_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "ChatMessage" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -153,6 +169,9 @@ CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationTok
 
 -- AddForeignKey
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "QueuedOrder" ADD CONSTRAINT "QueuedOrder_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ChatMessage" ADD CONSTRAINT "ChatMessage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

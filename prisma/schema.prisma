@@ -31,6 +31,7 @@
     stocks                  Stock[]
     chatMessages            ChatMessage[]
     notifications           Notification[]
+    queuedOrders            QueuedOrder[] 
   }
 
   model Notification {
@@ -48,6 +49,19 @@
 
     @@index([userId])
   }
+model QueuedOrder {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  symbol      String
+  quantity    Int
+  price       Float
+  actionType  String   // "buy" or "sell"
+  status      String   @default("pending") // "pending", "executed", "cancelled"
+  createdAt   DateTime @default(now())
+  scheduledAt DateTime // When the order should be executed
+  executedAt  DateTime?
+}
 model ChatMessage {
   id        String   @id @default(cuid())
   userId    String

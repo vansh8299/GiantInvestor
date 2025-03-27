@@ -135,6 +135,16 @@ const Portfolio: React.FC = () => {
   const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
   const [dailyData, setDailyData] = useState<{ date: string; price: number; adjustedClose: number; dividendAmount?: string; volume?: string; splitCoefficient?: string }[]>([]);
   const [userEmail, setUserEmail] = useState<string>(''); // Add this state
+  interface QueuedOrder {
+    id: string;
+    symbol: string;
+    actionType: string;
+    quantity: number;
+    price: number;
+    scheduledAt: string;
+  }
+
+  const [queuedOrders, setQueuedOrders] = useState<QueuedOrder[]>([]);
   const router = useRouter();
 
   // Fetch and set the email
@@ -147,6 +157,19 @@ const Portfolio: React.FC = () => {
     };
 
     fetchEmail();
+  }, []);
+  useEffect(() => {
+    const fetchQueuedOrders = async () => {
+      try {
+        const response = await fetch('/actions/queue');
+        const data = await response.json();
+        setQueuedOrders(data);
+      } catch (error) {
+        console.error('Error fetching queued orders:', error);
+      }
+    };
+    
+    fetchQueuedOrders();
   }, []);
   const getEmail = async () => {
     if (session?.user?.email) {
@@ -409,9 +432,11 @@ const Portfolio: React.FC = () => {
   }
 
   return (
+    
     <div className="container mx-auto py-8 mt-12 bg-green-50">
       <Toaster position="bottom-right" />
       <h1 className="text-3xl font-bold mb-6 text-green-600">My Portfolio</h1>
+      
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card>
@@ -445,6 +470,31 @@ const Portfolio: React.FC = () => {
             <CardTitle className="text-2xl">{portfolioStats.stockCount}</CardTitle>
           </CardHeader>
         </Card>
+        {queuedOrders.length > 0 && (
+  <Card className="mt-6">
+    <CardHeader>
+      <CardTitle>Queued Orders</CardTitle>
+      <CardDescription>Orders waiting for market to open</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-4">
+        {queuedOrders.map((order) => (
+          <div key={order.id} className="flex justify-between items-center p-3 border rounded-lg">
+            <div>
+              <p className="font-medium">{order.symbol} - {order.actionType}</p>
+              <p className="text-sm text-gray-600">
+                {order.quantity} shares at ₹{order.price.toFixed(2)}
+              </p>
+            </div>
+            <div className="text-sm text-gray-500">
+              Will execute at {new Date(order.scheduledAt).toLocaleString()}
+            </div>
+          </div>
+        ))}
+      </div>
+    </CardContent>
+  </Card>
+)}
       </div>
 
       <Tabs defaultValue="all" className="w-full">
