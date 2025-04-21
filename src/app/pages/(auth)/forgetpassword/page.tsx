@@ -24,7 +24,7 @@ const ForgotPassword = () => {
     setLoading(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { data } = await axios.post('/actions/forgetpassword', { email });
+      const { data } = await axios.post('/api/forgetpassword', { email });
       toast.success('OTP sent to your email');
       router.push(`/pages/verifyotp?email=${encodeURIComponent(email)}&mode=reset`);
     } catch (error) {

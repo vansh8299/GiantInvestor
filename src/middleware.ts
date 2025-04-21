@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 // Pages that are accessible without authentication
-const publicPages = ['/', '/pages/login','/actions/verifyotp', '/pages/signup', '/pages/verifyotp', '/pages/resetPassword','/actions/topgainersorlosers','/actions/signupapi','/actions/verifyotp','/actions/loginapi','/actions/forgetpassword', '/pages/forgetpassword']
+const publicPages = ['/', '/pages/login','/actions/verifyotp', '/pages/signup', '/pages/verifyotp', '/pages/resetPassword','/actions/topgainersorlosers','/actions/signupapi','/actions/verifyotp','/actions/loginapi','/api/forgetpassword', '/pages/forgetpassword']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
