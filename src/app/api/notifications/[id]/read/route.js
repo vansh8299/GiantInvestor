@@ -1,12 +1,13 @@
-// app/api/notifications/[id]/read/route.ts
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// app/api/notifications/[id]/read/route.js
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { db } from "@/lib/prisma";
 import jwt from 'jsonwebtoken';
 
 export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  req,
+  { params }
 ) {
   try {
     const id = params.id;
@@ -24,7 +25,7 @@ export async function PUT(
       const customToken = req.cookies.get('token')?.value;
       if (customToken) {
         const secret = process.env.JWT_SECRET || 'default_secret';
-        const decoded = jwt.verify(customToken, secret) as { email: string };
+        const decoded = jwt.verify(customToken, secret);
         token = { email: decoded.email };
       }
     }
@@ -39,7 +40,7 @@ export async function PUT(
     
     // Get user from database
     const user = await db.user.findUnique({
-      where: { email: token.email as string },
+      where: { email: token.email },
     });
     
     if (!user) {

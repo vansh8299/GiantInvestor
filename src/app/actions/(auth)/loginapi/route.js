@@ -1,5 +1,3 @@
-
-
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -7,8 +5,7 @@ import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
-export async function POST(request: { json: () => PromiseLike<{ email: string; password: string; }> | { email: string; password: string; }; }) {
-
+export async function POST(request) {
   try {
     const { email, password } = await request.json();
 
@@ -26,11 +23,11 @@ export async function POST(request: { json: () => PromiseLike<{ email: string; p
 
     const token = jwt.sign({ id: user.id, email: user.email }, secret, { expiresIn: '1d' });
 
-    const response = NextResponse.json({ message: 'Login successful' }, );
+    const response = NextResponse.json({ message: 'Login successful' });
     console.log('token', token);
     response.cookies.set('token', token, { maxAge: 86400, path: '/' });
     return response;
   } catch (error) {
-    return NextResponse.json({ error}, { status: 500 });
+    return NextResponse.json({ error }, { status: 500 });
   }
 }

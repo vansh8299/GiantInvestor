@@ -1,11 +1,9 @@
-// app/api/dividends/route.ts
+// app/api/dividends/route.js
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request, { params }: { params: { symbol: string } }) {
-
-
+export async function GET(request, { params }) {
   const {symbol} = await params; 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line no-unused-vars
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY; 
 
   try {

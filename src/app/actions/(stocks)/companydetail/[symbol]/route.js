@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request, { params }: { params: { symbol: string } }) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function GET(request, { params }) {
+    // eslint-disable-next-line no-unused-vars
     const apiKey = process.env.ALPHA_VANTAGE_API_KEY; // Replace with your Alpha Vantage API key
     const { symbol } = params;
     console.log('Symbol:', symbol);

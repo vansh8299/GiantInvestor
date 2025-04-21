@@ -1,9 +1,10 @@
-// app/api/stocks/[symbol]/route.ts
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// app/api/stocks/[symbol]/route.js
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request, { params }: { params: { symbol: string } }) {
+export async function GET(request, { params }) {
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY; 
-  const { symbol } =await params;
+  const { symbol } = await params;
   console.log('Symbol:', symbol);
 
   // Replace with your actual API key or use environment variables
@@ -19,7 +20,6 @@ export async function GET(request: Request, { params }: { params: { symbol: stri
     }
 
     return NextResponse.json(data);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
   }

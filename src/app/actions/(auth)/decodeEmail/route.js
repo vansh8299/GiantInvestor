@@ -7,8 +7,7 @@ import { NextResponse } from 'next/server'; // For App Router
 import jwt from 'jsonwebtoken';
 
 // For App Router (Next.js 13+)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function GET(request: { cookies: any; }) {
+export async function GET(request) {
   try {
     // Get the token from cookies
     const cookies = request.cookies;
@@ -32,4 +31,3 @@ export async function GET(request: { cookies: any; }) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
   }
 }
-

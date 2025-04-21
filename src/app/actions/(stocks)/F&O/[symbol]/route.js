@@ -1,34 +1,11 @@
-// app/api/historical-options/route.ts
+// app/api/historical-options/route.js
 import { NextResponse } from 'next/server';
 
-type OptionContract = {
-  contractID: string;
-  symbol: string;
-  expiration: string;
-  strike: string;
-  type: string;
-  last: string;
-  mark: string;
-  bid: string;
-  bid_size: string;
-  ask: string;
-  ask_size: string;
-  volume: string;
-  open_interest: string;
-  date: string;
-  implied_volatility: string;
-  delta: string;
-  gamma: string;
-  theta: string;
-  vega: string;
-  rho: string;
-};
-
-export async function GET(request: Request, { params }: { params: { symbol: string } }) {
-    const { symbol } =await params;
+export async function GET(request, { params }) {
+    const { symbol } = await params;
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line no-unused-vars
     const apiKey = process.env.ALPHA_VANTAGE_API_KEY; 
     
     const response = await fetch(
@@ -50,7 +27,7 @@ export async function GET(request: Request, { params }: { params: { symbol: stri
     }
 
     // Transform and validate the data
-    const options: OptionContract[] = data.data?.map((option: OptionContract) => ({
+    const options = data.data?.map((option) => ({
       contractID: option.contractID,
       symbol: option.symbol,
       expiration: option.expiration,

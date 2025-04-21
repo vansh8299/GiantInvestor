@@ -22,6 +22,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/components/header.jsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/components/header.jsx", "src/app/actions/(stocks)/balancesheet/[symbol]/route.js", "src/app/actions/(stocks)/cashFlow/[symbol]/route.js", "src/app/actions/(stocks)/companydetail/[symbol]/route.js", "src/app/actions/(stocks)/daily/[symbol]/route.js", "src/app/actions/(auth)/decodeEmail/route.js", "src/app/actions/(auth)/loginapi/route.js", "src/app/actions/(payment)/save/route.ts", "src/app/actions/(stocks)/dividend/[symbol]/route.js", "src/app/actions/(stocks)/earnings/[symbol]/route.js", "src/app/actions/(stocks)/ETFs/[symbol]/route.js", "src/app/actions/(stocks)/F&O/[symbol]/route.js", "src/app/actions/(stocks)/income/[symbol]/route.js", "src/app/actions/(stocks)/intraday/[symbol]/route.js", "src/app/actions/(stocks)/monthly/[symbol]/route.js", "src/app/actions/(stocks)/weekly/[symbol]/route.js", "src/app/actions/(stocks)/splits/[symbol]/route.js", "src/app/api/notifications/[id]/read/route.js"],
   "exclude": ["../node_modules"]
 }

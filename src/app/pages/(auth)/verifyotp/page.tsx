@@ -1,7 +1,6 @@
-// app/verify-otp/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -11,15 +10,16 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 
-const VerifyOtp = () => {
+export const dynamic = 'force-dynamic';
+
+const VerifyOtpContent = () => {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
-  const [remainingTime, setRemainingTime] = useState(600); // 10 minutes in seconds
+  const [remainingTime, setRemainingTime] = useState(600);
   const router = useRouter();
   const mode = searchParams.get('mode');
-  
 
   useEffect(() => {
     const emailParam = searchParams.get('email');
@@ -227,6 +227,18 @@ const VerifyOtp = () => {
         </CardContent>
       </Card>
     </div>
+  );
+};
+
+const VerifyOtp = () => {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    }>
+      <VerifyOtpContent />
+    </Suspense>
   );
 };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'react-hot-toast';
 
-const ResetPassword = () => {
+export const dynamic = 'force-dynamic';
+
+const ResetPasswordContent = () => {
   const searchParams = useSearchParams();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,11 +19,10 @@ const ResetPassword = () => {
   const router = useRouter();
   const email = searchParams.get('email');
 
-  // Verify that we have an email and the user is authorized to reset
   useEffect(() => {
     if (!email) {
       toast.error('Invalid reset password request');
-      router.push('/login');
+      router.push('/pages/login');
     }
   }, [email, router]);
 
@@ -48,7 +49,6 @@ const ResetPassword = () => {
       return;
     }
 
-    // Add password strength validation
     const hasUpperCase = /[A-Z]/.test(password);
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumbers = /\d/.test(password);
@@ -61,11 +61,7 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      await axios.post('/api/reset', {
-        email,
-        password
-      });
-      
+      await axios.post('/api/reset', { email, password });
       toast.success('Password reset successfully');
       router.push('/pages/login');
     } catch (error) {
@@ -139,10 +135,22 @@ const ResetPassword = () => {
                 'Reset Password'
               )}
             </Button>
-          </form>
+            </form>
         </CardContent>
       </Card>
     </div>
+  );
+};
+
+const ResetPassword = () => {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 };
 
