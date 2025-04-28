@@ -6,32 +6,43 @@ import jwt from 'jsonwebtoken';
 export async function GET(request: NextRequest) {
   try {
     let token;
-
+    
     // Try to get the token from NextAuth
-    const nextAuthToken = await getToken({ 
+    const nextAuthToken = await getToken({
       req: request,
       secret: process.env.NEXTAUTH_SECRET
     });
-
+    
     if (nextAuthToken) {
       token = nextAuthToken;
     } else {
-      // If NextAuth token is not found, try to get the custom JWT token from cookies
+      // Check for custom token or other NextAuth cookie variants
       const customToken = request.cookies.get('token')?.value;
+      const nextAuthSessionToken = request.cookies.get('next-auth.session-token')?.value;
+      const secureNextAuthSessionToken = request.cookies.get('__Secure-next-auth.session-token')?.value;
+      
       if (customToken) {
         const secret = process.env.JWT_SECRET || 'default_secret';
         const decoded = jwt.verify(customToken, secret) as { email: string };
         token = { email: decoded.email };
+      } else if (nextAuthSessionToken) {
+        const secret = process.env.NEXTAUTH_SECRET || 'default_secret';
+        const decoded = jwt.verify(nextAuthSessionToken, secret) as { email: string };
+        token = { email: decoded.email };
+      } else if (secureNextAuthSessionToken) {
+        const secret = process.env.NEXTAUTH_SECRET || 'default_secret';
+        const decoded = jwt.verify(secureNextAuthSessionToken, secret) as { email: string };
+        token = { email: decoded.email };
       }
     }
-
+    
     if (!token?.email) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
-
+    
     const user = await db.user.findUnique({
       where: {
         email: token.email
@@ -50,7 +61,7 @@ export async function GET(request: NextRequest) {
         // Exclude sensitive fields like password, otp, etc.
       }
     });
-
+    
     // If user not found, return not found
     if (!user) {
       return NextResponse.json(
@@ -58,7 +69,7 @@ export async function GET(request: NextRequest) {
         { status: 404 }
       );
     }
-
+    
     // Return the user details
     return NextResponse.json({ user }, { status: 200 });
   } catch (error) {
