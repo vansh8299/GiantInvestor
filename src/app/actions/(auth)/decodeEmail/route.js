@@ -11,7 +11,7 @@ export async function GET(request) {
   try {
     // Get the token from cookies
     const cookies = request.cookies;
-    const token = cookies.get('token')?.value;
+    const token = cookies.get('token')?.value || cookies.get('next-auth.session-token')?.string || cookies.get('__Secure-next-auth.session-token')?.string ;
     
     if (!token) {
       return NextResponse.json({ error: 'No token found' }, { status: 401 });
