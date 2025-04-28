@@ -13,8 +13,8 @@ export function isMarketOpen(): boolean {
   if (day >= 1 && day <= 5) {
     // Check if time is between 9:15 and 15:30
     if (
-        (hours >= 9 && hours >= 15) &&
-        (hours <= 15 && minutes <= 30)
+      (hours > 9 || (hours === 9 && minutes >= 15)) &&
+      (hours < 15 || (hours === 15 && minutes <= 30))
     ) {
       return true;
     }
@@ -42,7 +42,7 @@ export function getNextMarketOpenTime(): Date {
       nextOpen.setHours(9, 15, 0, 0);
       return nextOpen;
     }
-    daysToAdd++;
+    daysToAdd = 1; // Reset to 1 after first iteration
   }
 }
 
@@ -56,6 +56,8 @@ export async function processQueuedOrders() {
     },
     include: { user: true },
   });
+
+  console.log(`Processing ${orders.length} queued orders at ${now}`);
 
   for (const order of orders) {
     try {
@@ -80,6 +82,7 @@ export async function processQueuedOrders() {
 }
 
 // Helper function to process an order
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function processOrder(order: any) {
   try {
     const { userId, symbol, quantity, price, actionType } = order;
@@ -96,7 +99,7 @@ async function processOrder(order: any) {
       }
 
       // Start a transaction to ensure data consistency
-      return await db.$transaction(async (tx: { user: { update: (arg0: { where: { id: any; }; data: { balance: { decrement: number; }; }; }) => any; }; stock: { findFirst: (arg0: { where: { userId: any; symbol: any; }; }) => any; update: (arg0: { where: { id: any; }; data: { quantity: any; purchasePrice: number; currentPrice: any; updatedAt: Date; }; }) => any; create: (arg0: { data: { userId: any; symbol: any; quantity: any; purchasePrice: any; currentPrice: any; }; }) => any; }; transaction: { create: (arg0: { data: { userId: any; amount: number; type: string; status: string; }; }) => any; }; notification: { create: (arg0: { data: { userId: any; title: string; message: string; type: string; metadata: string; read: boolean; }; }) => any; }; }) => {
+      return await db.$transaction(async (tx) => {
         // Deduct amount from user balance
         const updatedUser = await tx.user.update({
           where: { id: userId },
@@ -175,13 +178,7 @@ async function processOrder(order: any) {
     // Handle sell action
     else if (actionType === "sell") {
       // Start a transaction to ensure data consistency
-      return await db.$transaction(async (tx: { user: { update: (arg0: { where: { id: any; }; data: { balance: { increment: number; }; }; }) => any; }; stock: { findFirst: (arg0: { where: { userId: any; symbol: any; }; }) => any; delete: (arg0: { where: { id: any; }; }) => any; update: (arg0: { where: { id: any; }; data: { quantity: { decrement: any; }; currentPrice: any; updatedAt: Date; }; }) => any; }; transaction: { create: (arg0: { data: { userId: any; amount: number; type: string; status: string; }; }) => any; }; notification: { create: (arg0: { data: { userId: any; title: string; message: string; type: string; metadata: string; read: boolean; }; }) => any; }; }) => {
-        // Add amount to user balance
-        const updatedUser = await tx.user.update({
-          where: { id: userId },
-          data: { balance: { increment: totalAmount } },
-        });
-
+      return await db.$transaction(async (tx) => {
         // Find existing stock holding
         const existingStock = await tx.stock.findFirst({
           where: { 
@@ -197,6 +194,12 @@ async function processOrder(order: any) {
         if (existingStock.quantity < quantity) {
           throw new Error("Insufficient shares to sell");
         }
+
+        // Add amount to user balance
+        const updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: { balance: { increment: totalAmount } },
+        });
 
         let stockResult;
         

@@ -12,7 +12,7 @@ export function middleware(request: NextRequest) {
   const isPublicPage = publicPages.includes(pathname)
 
   // Get the token from cookies
-  const token = request.cookies.get('token')?.value || request.cookies.get('next-auth.session-token')?.value
+  const token = request.cookies.get('token')?.value || request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value
 
   // If the page is not public and there's no token, redirect to login
   if (!isPublicPage && !token) {
